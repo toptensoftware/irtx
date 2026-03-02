@@ -1,6 +1,6 @@
 # irtx
 
-A simple, Wifi enabled Infrared transmitter (aka "IR Blaster").
+A simple, open source, Wifi enabled infrared transmitter - ie: an "IR Blaster".
 
 ![Final](./photos/final.jpeg)
 
@@ -65,7 +65,7 @@ I printed the case in PLA, and the clamp in PETG.  You might be able to print it
 
 ## Connect the ESP32
 
-There a three wires from the ESP32 Zero to the IR transmitter circuit.  
+There are three wires from the ESP32 Zero to the IR transmitter circuit.  
 
 * The IR transmitter connection points are shown in the above stripboard image.
 
@@ -93,7 +93,6 @@ The firmware for the esp32 is an Arduino project.  To build
 
     ```bash
     arduino-cli lib install "Adafruit NeoPixel"
-    arduino-cli lib install "NimBLE-Arduino"
     ```
 
 4. Build
