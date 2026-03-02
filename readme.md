@@ -142,7 +142,7 @@ The `carrierFrequency` must be `38000` otherwise the packet is ignored (might ad
 The `gap` value is a minimum time (in microseconds) that the 
 device will enforce between the end of one transmission and the start of the next.
 
-The `timingData` is an array of microsecond timing values where odd indices are pulses and even indices are spaces.  If an odd number of values is passed an implicit zero gap is appended.
+The `timingData` is an array of microsecond timing values where event indices are pulses and odd indices are spaces.  If an odd number of values is passed an implicit zero gap is appended.
 
 Note: pronto IR code definitions usually include the `gap` as the last space in the timing data. I recommended to pass that last space timing value as the `gap` parameter and set the trailing timing space to 0.
 
