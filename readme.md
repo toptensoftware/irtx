@@ -144,4 +144,55 @@ device will enforce between the end of one transmission and the start of the nex
 
 The `timingData` is an array of microsecond timing values where odd indices are pulses and even indices are spaces.  If an odd number of values is passed an implicit zero gap is appended.
 
-Note: pronto IR code definitions usually include the `gap` as the last space in the timing data (ie: `pulseSp).  It's recommended to pass that last space timing value as the `gap` parameter and set the trailing timing space to 0.
+Note: pronto IR code definitions usually include the `gap` as the last space in the timing data. I recommended to pass that last space timing value as the `gap` parameter and set the trailing timing space to 0.
+
+
+## NodeJS Example
+
+The following NodeJS code demonstates how to send a IR transmission packet to the device.
+
+```js
+import dgram from "node:dgram";
+
+const ESP32_IP = "10.1.1.187"; // TODO: change to your ESP32's IP
+const UDP_PORT = 4210;
+
+// Header
+const command = 1;
+const deviceIndex = 0;
+const carrierFrequency = 38000;
+const gap = 100000;
+
+// Timing pairs (microseconds): pulse, space, pulse, space
+// TODO: replace these with actual IR code timing data
+const timings = [1000, 2000, 3000, 4000];
+
+// Build packet header
+const header = Buffer.alloc(12);
+header.writeUInt16LE(command, 0);
+header.writeUInt16LE(deviceIndex, 2);
+header.writeUInt32LE(carrierFrequeny, 4);
+header.writeUInt32LE(gap, 8);
+
+// Build timing data
+const body = Buffer.alloc(timings.length * 2);
+timings.forEach((v, i) => body.writeUInt16LE(v, i * 2));
+
+// Join em
+const packet = Buffer.concat([header, body]);
+
+// Send it....
+const sock = dgram.createSocket("udp4");
+sock.send(packet, UDP_PORT, ESP32_IP, (err) => {
+  if (err) 
+    console.error(err);
+  else 
+    console.log(`Sent ${packet.length} bytes to ${ESP32_IP}:${UDP_PORT}`);
+  sock.close();
+});
+```
+
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
