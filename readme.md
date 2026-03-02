@@ -19,6 +19,7 @@ Parts:
 * BC337 NPN transistor
 * 2x IR LEDs (like [these](https://www.jaycar.com.au/5mm-infrared-transmitting-led/p/ZD1945))
 * Veroboard 13x8 pins
+* [Waveshare ESP32-C3 Zero](https://www.waveshare.com/wiki/ESP32-C3-Zero)
 
 ![Circuit Diagram](./ircircuit/irtx-circuit.png)
 
@@ -75,7 +76,7 @@ There a three wires from the ESP32 Zero to the IR transmitter circuit.
 
 
 
-## Build Instructions
+## Build the Firmware
 
 The firmware for the esp32 is an Arduino project.  To build
 
@@ -145,6 +146,7 @@ device will enforce between the end of one transmission and the start of the nex
 The `timingData` is an array of microsecond timing values where odd indices are pulses and even indices are spaces.  If an odd number of values is passed an implicit zero gap is appended.
 
 Note: pronto IR code definitions usually include the `gap` as the last space in the timing data. I recommended to pass that last space timing value as the `gap` parameter and set the trailing timing space to 0.
+
 
 
 ## NodeJS Example
