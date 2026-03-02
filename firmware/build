@@ -1,0 +1,18 @@
+#!/bin/bash
+
+set -e
+
+## Setup for build
+#arduino-cli core update-index --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+#arduino-cli core install esp32:esp32 --additional-urls https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+#arduino-cli lib install "Adafruit NeoPixel"
+#arduino-cli lib install "NimBLE-Arduino"
+
+## Check board fqbn
+#arduino-cli board listall | grep -i "c3_zero"
+
+## Find Port
+#arduino-cli board list
+
+# Compile
+arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app .

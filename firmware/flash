@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+# Upload
+arduino-cli upload --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app --port $1 .
