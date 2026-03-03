@@ -2,5 +2,5 @@
 
 #include <stdint.h>
 
-void setupRmt();
+void setupIr();
 void handleIrPacket(uint8_t* data, int length);

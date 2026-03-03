@@ -15,4 +15,6 @@ set -e
 #arduino-cli board list
 
 # Compile
-arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app .
+arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app .  $*
+
+

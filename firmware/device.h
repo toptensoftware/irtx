@@ -2,4 +2,5 @@
 
 extern char deviceName[64];
 
-void loadDeviceName();
+void setupDeviceName();
+void statusDeviceName();

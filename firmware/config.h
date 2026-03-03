@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Preferences.h>
+
 // ---- Logging ----
 // Operational log messages prefixed with seconds since boot.
 #define LOG(fmt, ...) Serial.printf("[%7.3f] " fmt, millis() / 1000.0f, ##__VA_ARGS__)
@@ -15,3 +17,5 @@
 #define MAX_IR_DEVICES     16
 #define IR_HEADER_SIZE     12  // uint16 cmd + uint16 irDevIdx + uint32 carrierFreq + uint32 gap
 #define INPUT_MAX          256
+
+extern Preferences prefs;

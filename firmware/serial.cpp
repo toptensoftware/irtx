@@ -1,12 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <Preferences.h>
-#include "esp_mac.h"
 #include "config.h"
 #include "led.h"
 #include "device.h"
 #include "wifi_udp.h"
-#include "serial_cmd.h"
+#include "serial.h"
+#include "ble.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -33,7 +32,6 @@ static void handleCommand(const char* line)
         char password[256];
         passLen = min(passLen, 255);
         memcpy(password, p, passLen); password[passLen] = '\0';
-        Preferences prefs;
         prefs.begin("wifi", false);
         prefs.putString("ssid", ssid);
         prefs.putString("password", password);
@@ -63,38 +61,25 @@ static void handleCommand(const char* line)
         }
         char newName[64];
         memcpy(newName, p, nameLen); newName[nameLen] = '\0';
-        Preferences prefs;
         prefs.begin("device", false);
         prefs.putString("name", newName);
         prefs.end();
         LOG("Device name set to \"%s\" — restart to apply\n", newName);
 
     }
+    else if (strncmp(line, "pair ", 5) == 0) 
+    {
+        blePair(atoi(line + 5));
+    } 
+    else if (strncmp(line, "unpair ", 7) == 0) 
+    {
+        bleUnpair(atoi(line + 7));
+    }
     else if (strcmp(line, "status") == 0)
     {
-        Serial.printf("Device name : %s\n", deviceName);
-        Serial.println("--- WiFi ---");
-        Preferences prefs;
-        prefs.begin("wifi", true);
-        String ssid = prefs.getString("ssid", "(not set)");
-        prefs.end();
-        Serial.printf("SSID        : %s\n", ssid.c_str());
-        if (WiFi.status() == WL_CONNECTED)
-        {
-            Serial.printf("IP address  : %s\n", WiFi.localIP().toString().c_str());
-            Serial.printf("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
-            Serial.printf("RSSI        : %d dBm\n", WiFi.RSSI());
-        }
-        else
-        {
-            Serial.println("Status      : disconnected");
-        }
-        uint8_t mac[6];
-        esp_read_mac(mac, ESP_MAC_WIFI_STA);
-        Serial.printf("MAC (WiFi)  : %02X:%02X:%02X:%02X:%02X:%02X\n",
-                      mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        Serial.printf("UDP port    : %d\n", UDP_PORT);
-
+        statusDeviceName();
+        statusWifi();
+        statusBle();
     }
     else if (*line == '\0')
     {
@@ -107,7 +92,7 @@ static void handleCommand(const char* line)
     }
 }
 
-void handleSerialInput()
+void pollSerial()
 {
     while (Serial.available())
     {

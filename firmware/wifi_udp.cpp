@@ -1,11 +1,11 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <Preferences.h>
+#include "esp_mac.h"
 #include "config.h"
 #include "led.h"
 #include "device.h"
-#include "rmt_ir.h"
+#include "ir.h"
 #include "wifi_udp.h"
 
 WiFiUDP udp;
@@ -14,7 +14,6 @@ static uint8_t packetBuffer[IR_HEADER_SIZE + MAX_TIMING_VALUES * 2];
 // ---- WiFi Setup ----
 void setupWifi()
 {
-    Preferences prefs;
     prefs.begin("wifi", true);
     String wifiSsid = prefs.getString("ssid", "");
     String wifiPass = prefs.getString("password", "");
@@ -40,6 +39,13 @@ void setupWifi()
         ledColor(0, 0, toggle ? 4 : 0);
     }
     LOG("Connected! IP: %s\n", WiFi.localIP().toString().c_str());
+
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        udp.begin(UDP_PORT);
+        LOG("Listening for UDP on port %d\n", UDP_PORT);
+    }
+
 }
 
 // ---- UDP Packet Dispatcher ----
@@ -56,9 +62,23 @@ void handleUdpPacket(uint8_t* data, int length)
 }
 
 // ---- UDP Poll (called from loop) ----
-void pollUdp()
+void pollWifi()
 {
-    if (WiFi.status() != WL_CONNECTED) return;
+    // WiFi reconnect
+    if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED)
+    {
+        ledColor(4, 2, 0);
+        LOG("WiFi disconnected, reconnecting...\n");
+        WiFi.reconnect();
+        while (WiFi.status() != WL_CONNECTED) delay(500);
+        LOG("Reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
+        ledColor(0, 4, 0);
+    }
+
+
+    if (WiFi.status() != WL_CONNECTED) 
+        return;
+        
     int packetSize = udp.parsePacket();
     if (packetSize >= 2)
     {
@@ -69,4 +89,29 @@ void pollUdp()
     {
         udp.read(packetBuffer, packetSize); // flush runt
     }
+}
+
+
+void statusWifi()
+{
+    Serial.println("--- WiFi ---");
+    prefs.begin("wifi", true);
+    String ssid = prefs.getString("ssid", "(not set)");
+    prefs.end();
+    Serial.printf("SSID        : %s\n", ssid.c_str());
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        Serial.printf("IP address  : %s\n", WiFi.localIP().toString().c_str());
+        Serial.printf("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
+        Serial.printf("RSSI        : %d dBm\n", WiFi.RSSI());
+    }
+    else
+    {
+        Serial.println("Status      : disconnected");
+    }
+    uint8_t mac[6];
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    Serial.printf("MAC (WiFi)  : %02X:%02X:%02X:%02X:%02X:%02X\n",
+                    mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
+    Serial.printf("UDP port    : %d\n", UDP_PORT);
 }

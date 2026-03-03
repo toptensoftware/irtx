@@ -3,7 +3,7 @@
 #include "driver/rmt_encoder.h"
 #include "config.h"
 #include "led.h"
-#include "rmt_ir.h"
+#include "ir.h"
 
 // ---- RMT Globals ----
 static rmt_channel_handle_t txChannel   = NULL;
@@ -19,7 +19,7 @@ static rmt_symbol_word_t rmtSymbols[MAX_TIMING_VALUES];
 static int               rmtSymbolCount = 0;
 
 // ---- RMT Setup ----
-void setupRmt()
+void setupIr()
 {
     rmt_tx_channel_config_t txConfig = {};
     txConfig.gpio_num = (gpio_num_t)IR_TX_PIN;
@@ -39,6 +39,8 @@ void setupRmt()
     ESP_ERROR_CHECK(rmt_new_copy_encoder(&encConfig, &copyEncoder));
 
     LOG("RMT initialized\n");
+
+    LOG("IR pin: GPIO %d, Carrier: %d Hz\n", IR_TX_PIN, CARRIER_FREQ);
 }
 
 // ---- Build RMT Symbols ----
