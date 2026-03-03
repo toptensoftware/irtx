@@ -148,51 +148,9 @@ Note: pronto IR code definitions usually include the `gap` as the last space in 
 
 
 
-## NodeJS Example
+## NodeJS Library
 
-The following NodeJS code demonstates how to send a IR transmission packet to the device.
-
-```js
-import dgram from "node:dgram";
-
-const ESP32_IP = "10.1.1.187"; // TODO: change to your ESP32's IP
-const UDP_PORT = 4210;
-
-// Header
-const command = 1;
-const deviceIndex = 0;
-const carrierFrequency = 38000;
-const gap = 100000;
-
-// Timing pairs (microseconds): pulse, space, pulse, space
-// TODO: replace these with actual IR code timing data
-const timings = [1000, 2000, 3000, 4000];
-
-// Build packet header
-const header = Buffer.alloc(12);
-header.writeUInt16LE(command, 0);
-header.writeUInt16LE(deviceIndex, 2);
-header.writeUInt32LE(carrierFrequeny, 4);
-header.writeUInt32LE(gap, 8);
-
-// Build timing data
-const body = Buffer.alloc(timings.length * 2);
-timings.forEach((v, i) => body.writeUInt16LE(v, i * 2));
-
-// Join em
-const packet = Buffer.concat([header, body]);
-
-// Send it....
-const sock = dgram.createSocket("udp4");
-sock.send(packet, UDP_PORT, ESP32_IP, (err) => {
-  if (err) 
-    console.error(err);
-  else 
-    console.log(`Sent ${packet.length} bytes to ${ESP32_IP}:${UDP_PORT}`);
-  sock.close();
-});
-```
-
+See [irtx-node](https://github.com/toptensoftware/irtx-node) for library.
 
 ## License
 
