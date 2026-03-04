@@ -7,6 +7,7 @@
 #include "device.h"
 #include "ir.h"
 #include "wifi_udp.h"
+#include "ble.h"
 
 WiFiUDP udp;
 static uint8_t packetBuffer[IR_HEADER_SIZE + MAX_TIMING_VALUES * 2];
@@ -56,7 +57,9 @@ void handleUdpPacket(uint8_t* data, int length)
     memcpy(&cmd, data, 2);
     switch (cmd)
     {
-        case 1:  handleIrPacket(data, length);      break;
+        case 1: handleIrPacket(data, length);      break;
+        case 2: handleBleConnectPacket(data, length);     break;
+        case 3: handleBleHidPacket(data, length);     break;
         default: LOG("UDP: unknown command %d\n", cmd);
     }
 }

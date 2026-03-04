@@ -19,9 +19,8 @@ NimBLECharacteristic* consumerReport = nullptr;
 
 // Peer addresses
 NimBLEAddress peerAddress;
-uint8_t       peerAddrType = 0;
-bool          peerValid = false;
 
+static char slotName[80];
 int activeSlot = -1;
 bool isPairing = false;
 
@@ -98,18 +97,15 @@ void generate_slot_address(int slot, ble_addr_t *addr)
 // ---- BLE NVS Helpers ----
 
 // Stores 7 bytes per slot: 6-byte address + 1-byte address type
-void loadBleAddress(int slot) 
+bool loadPeerAddress(int slot, NimBLEAddress& addr) 
 {
-    // Reset current peer address
-    peerAddrType = 0;
-    peerValid = false;
-
     // Setup key
     char key[8];
     snprintf(key, sizeof(key), "peer%d", slot);
     uint8_t buf[7];
 
     // Read prefs
+    bool valid = false;
     prefs.begin("ble", true);
     if (prefs.getBytes(key, buf, 7) == 7) 
     {
@@ -120,14 +116,15 @@ void loadBleAddress(int slot)
             buf[j] = buf[5-j];
             buf[5-j] = temp;
         }
-        peerAddress = NimBLEAddress(buf, buf[6]);
-        peerAddrType = buf[6];
-        peerValid = true;
+        addr = NimBLEAddress(buf, buf[6]);
+        valid = true;
     }
     prefs.end();
+
+    return valid;
 }
 
-void saveBleAddress(int slot, NimBLEAddress addr) 
+void savePeerAddress(int slot, NimBLEAddress addr) 
 {
     prefs.begin("ble", false);
     char key[8];
@@ -139,15 +136,29 @@ void saveBleAddress(int slot, NimBLEAddress addr)
     prefs.end();
 }
 
-void clearBleAddress(int slot) 
+void clearPeerAddress(int slot) 
 {
     prefs.begin("ble", false);
     char key[8];
     snprintf(key, sizeof(key), "peer%d", slot);
     prefs.remove(key);
     prefs.end();
-    peerValid = false;
 }
+
+void clearWhiteList()
+{
+    if (NimBLEDevice::getWhiteListCount())
+    {
+        LOG("Clearing white list...\n");
+        while (NimBLEDevice::getWhiteListCount())
+        {
+            NimBLEDevice::whiteListRemove(NimBLEDevice::getWhiteListAddress(0));
+        }
+        LOG("White list cleared.\n");
+    }
+}
+
+
 
 // ---- BLE Server Callbacks ----
 class BleCallbacks : public NimBLEServerCallbacks 
@@ -160,6 +171,21 @@ class BleCallbacks : public NimBLEServerCallbacks
     virtual void onAuthenticationComplete(NimBLEConnInfo& connInfo) override 
     {
         LOG("BLE: onAuthenticationComplete: %s\n", connInfo.getAddress().toString().c_str());
+
+        // After IRK exchange, peer_id_addr in the connection descriptor is
+        // updated to the stable identity address (not the rotating RPA).
+        ble_gap_conn_desc desc;
+        NimBLEAddress identityAddr = connInfo.getAddress(); // fallback to OTA addr
+        if (ble_gap_conn_find(connInfo.getConnHandle(), &desc) == 0)
+            identityAddr = NimBLEAddress(desc.peer_id_addr);
+
+        if (isPairing)
+        {
+            peerAddress = identityAddr;
+            savePeerAddress(activeSlot, identityAddr);
+            LOG("BLE: slot %d paited to %s\n", activeSlot, identityAddr.toString().c_str());
+            isPairing = false;
+        }
     }
 
     virtual void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override 
@@ -180,8 +206,10 @@ void startServer(int slot)
     if (activeSlot == -1)
         return;
 
-    char slotName[64];
     sprintf(slotName, "%s-%i", deviceName, slot);
+
+    LOG("BLE starting (%s)...\n", slotName);
+
     NimBLEDevice::init(slotName);
     NimBLEDevice::setSecurityAuth(true, true, true); // bonding=true, MITM=true, SC=true
 
@@ -200,7 +228,7 @@ void startServer(int slot)
     // Create server
     bleServer = NimBLEDevice::createServer();
     bleServer->setCallbacks(new BleCallbacks());
-    bleServer->advertiseOnDisconnect(false); // we manage advertising manually
+    bleServer->advertiseOnDisconnect(false);
 
     // Create HID device
     hidDevice = new NimBLEHIDDevice(bleServer);
@@ -216,16 +244,64 @@ void startServer(int slot)
     // Start 
     hidDevice->startServices();
     bleServer->start(); 
+
+    LOG("BLE started.\n");
+
+    // Initialize advertising
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->setAppearance(HID_KEYBOARD);
+    adv->setName(slotName);
+    adv->addServiceUUID(hidDevice->getHidService()->getUUID());
+    adv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+
 }
+
 
 void stopServer()
 {
     if (activeSlot >= 0)
     {
+        LOG("BLE Stopping...\n");
+
+        // Disable re-advertise since we're trying to shutdown
+        bleServer->advertiseOnDisconnect(true);
+        
+        // Reset white list
+        clearWhiteList();
+
+        // Disconnect
+        if (bleServer->getConnectedCount() > 0)
+        {
+            LOG("BLE disconnecting...\n");
+            bleServer->disconnect(bleServer->getPeerInfo(0));
+            LOG("BLE disconnected.\n");
+        }
+
+        // Stop advertising
+        NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+        if (adv->isAdvertising())
+        {
+            LOG("BLE stopping advertising...\n");
+            adv->stop();
+            delay(100);
+            LOG("BLE advertising stopped.\n");
+        }
+
+        LOG("Pausing...\n");
+//        for (int i=0; adv->isAdvertising() || bleServer->getConnectedCount() || i<20; i++)
+        for (int i=0; i<20; i++)
+            delay(5);
+        LOG("Continuing...\n");
+
+        // Reset
+        LOG("BLE deiniting...\n");
         NimBLEDevice::deinit(true);
         bleServer = nullptr;
         hidDevice = nullptr;
         activeSlot = -1;
+        LOG("BLE deinited.\n");
+
+        LOG("BLE Stopped.\n");
     }
 }
 
@@ -244,34 +320,32 @@ void pollBle()
 void statusBle()
 {
     Serial.println("--- BLE ---");
-    /*
-    if (connectedDeviceIndex >= 0)
-        Serial.printf("Status      : connected (slot %d)\n", connectedDeviceIndex);
-    else if (pairingSlot >= 0)
-        Serial.printf("Status      : pairing (slot %d, %lus remaining)\n",
-                        pairingSlot, (PAIRING_TIMEOUT_MS - (millis() - pairingStartMs)) / 1000);
-    else if (desiredDeviceIndex >= 0)
-        Serial.printf("Status      : advertising for slot %d\n", desiredDeviceIndex);
-    else
-        Serial.println("Status      : idle (send cmd=3 to activate)");
-    */
+
     for (int i = 0; i < MAX_BLE_DEVICES; i++) 
     {
         ble_addr_t mac;       
         generate_slot_address(i, &mac);
 
-        Serial.printf("Slot %d      : %02X:%02X:%02X:%02X:%02X:%02X\n",
+        Serial.printf("Slot %d      : id: %02X:%02X:%02X:%02X:%02X:%02X",
                 i, mac.val[5], mac.val[4], mac.val[3], mac.val[2], mac.val[1], mac.val[0]);
 
-            /*
-        if (peerValid[i])
-            Serial.printf("Slot %d      : %s%s%s\n", i,
-                            peerAddresses[i].toString().c_str(),
-                            connectedDeviceIndex == i ? " (connected)" : "",
-                            desiredDeviceIndex == i   ? " (desired)"   : "");
-        else
-            Serial.printf("Slot %d      : (empty)\n", i);
-            */
+        NimBLEAddress addr;
+        if (loadPeerAddress(i, addr))
+        {
+            auto val = addr.getVal();
+            Serial.printf("  peer: %02X:%02X:%02X:%02X:%02X:%02X",
+                 val[5], val[4], val[3], val[2], val[1], val[0]);
+        }
+
+        if (i == activeSlot)
+        {
+            if (bleServer->getConnectedCount() > 0)
+                Serial.printf(" Connected");
+            else if (NimBLEDevice::getAdvertising()->isAdvertising())
+                Serial.printf(" Advertising");
+        }
+
+        Serial.printf("\n");
     }
 }
 
@@ -291,15 +365,16 @@ void blePair(int slot)
     // Start advertising
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
     adv->setScanFilter(false, false);
-    adv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+    isPairing = true;
+    bleServer->advertiseOnDisconnect(false);
     if (!adv->start(0))
     {
-        LOG("Failed to start advertising");
-        activeSlot = -1;
+        LOG("Failed to start advertising.\n");
+        stopServer();
         return;
     }
 
-    LOG("Advertising...");
+    LOG("Advertising for pairing...\n");
 }
 
 void bleUnpair(int slot)
@@ -310,21 +385,128 @@ void bleUnpair(int slot)
         return;
     }
 
-    // Disconnect
-    if (bleServer->getConnectedCount() > 0)
-        bleServer->disconnect(bleServer->getPeerInfo(0));
+    // Get the peer address
+    NimBLEAddress addr;
+    if (!loadPeerAddress(slot, addr))
+    {
+        LOG("Slot %i not paired.\n", slot);
+        return;
+    }
 
-    // Stop advertising
-    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-    adv->stop();
+    // Stop the server if currently connected on this slot
+    if (activeSlot == slot)
+    {
+        stopServer();
+    }
 
     // Delete bond
-    if (peerValid)
-        NimBLEDevice::deleteBond(peerAddress);
+    NimBLEDevice::deleteBond(addr);
+    clearPeerAddress(slot);
 
-    // Clear
-    clearBleAddress(slot);
-    activeSlot = -1;
+    LOG("Unpaired slot %d\n", slot);
+}
 
-    LOG("Unpaired device %d\n", slot);
+void bleConnect(int slot)
+{
+    if (slot < 0)
+    {
+        stopServer();
+        return;
+    }
+
+    if (slot >= MAX_BLE_DEVICES) 
+    {
+        LOG("Usage: pair <0-%d>\n", MAX_BLE_DEVICES - 1);
+        return;
+    }
+
+    // Load the paired peer addres
+    if (!loadPeerAddress(slot, peerAddress))
+    {
+        LOG("No paired device for slot %d\n", slot);
+        return;
+    }
+
+    // Start server
+    startServer(slot);
+
+    // Setup white list
+    NimBLEDevice::whiteListAdd(peerAddress);
+
+    // Start advertising
+    isPairing = false;
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->setScanFilter(false, true);  // connections from whitelist only
+    adv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
+    if (!adv->start(0))
+    {
+        LOG("Failed to start advertising.\n");
+        stopServer();
+        return;
+    }
+    bleServer->advertiseOnDisconnect(true);
+    adv->start(0);
+
+
+    LOG("Advertising for connection to %s...\n", peerAddress.toString().c_str());
+}
+
+void handleBleConnectPacket(uint8_t* data, int length)
+{
+    if (length < 3) {
+        LOG("CONNECT: packet too short\n");
+        return;
+    }
+    uint8_t bleDevIdx = data[2];
+
+    if (bleDevIdx < MAX_BLE_DEVICES)
+        bleConnect(bleDevIdx);
+    else
+        bleConnect(-1);
+}
+
+void handleBleHidPacket(uint8_t* data, int length)
+{
+    uint8_t bleDevIdx  = data[2];
+    uint8_t reportId   = data[3];
+    uint8_t* reportData = data + 4;
+    int      reportLen  = length - 4;
+
+    // Check index
+    if (bleDevIdx >= MAX_BLE_DEVICES) {
+        LOG("HID: device index out of range\n");
+        return;
+    }
+
+    // Only deliver to the currently pre-connected (desired) device
+    if ((int)bleDevIdx != activeSlot) {
+        LOG("HID: packet for device %i dropped, currently connected to slot %i\n",
+            (int)bleDevIdx, (int)activeSlot);
+        return;
+    }
+
+    // Already connected — send immediately
+    if (bleServer->getConnectedCount() ==0) 
+    {
+        LOG("HID: packet for device %i dropped - not connected\n",
+            (int)bleDevIdx);
+        return;
+    }
+
+    if (reportId == 1 && reportLen == 8) 
+    {
+        LOG("BLE: sending keyboard report\n");
+        keyboardReport->setValue(reportData, reportLen);
+        keyboardReport->notify();
+    } 
+    else if (reportId == 2 && reportLen == 2) 
+    {
+        LOG("BLE: sending consumer report\n");
+        consumerReport->setValue(reportData, reportLen);
+        consumerReport->notify();
+    }
+    else
+    {
+        LOG("BLE: dropping unrecognized hid packet: reportId: %d length: %d\n", (int)reportId, (int)reportLen);
+    }
 }

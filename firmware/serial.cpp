@@ -75,6 +75,10 @@ static void handleCommand(const char* line)
     {
         bleUnpair(atoi(line + 7));
     }
+    else if (strncmp(line, "connect ", 8) == 0) 
+    {
+        bleConnect(atoi(line + 8));
+    }
     else if (strcmp(line, "status") == 0)
     {
         statusDeviceName();
