@@ -468,15 +468,24 @@ void bleUnpair(int slot)
 
 void bleConnect(int slot)
 {
+    // Stop?
     if (slot < 0)
     {
         stopServer();
         return;
     }
 
+    // Invalid?
     if (slot >= MAX_BLE_DEVICES) 
     {
         LOG("Usage: pair <0-%d>\n", MAX_BLE_DEVICES - 1);
+        return;
+    }
+
+    // Redundant?
+    if (activeSlot == slot)
+    {
+        LOG("Slot %d already connected\n", slot);
         return;
     }
 

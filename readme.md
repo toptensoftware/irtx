@@ -1,9 +1,11 @@
 # irtx
 
-A simple, open source, Wifi enabled infrared transmitter - ie: an "IR Blaster".
+A simple, open source, Wifi enabled infrared transmitter (ie: an "IR Blaster") and BLE HID transmitter
 
 ![Final](./photos/final.jpeg)
 
+As a BLE blaster the device appears as a keyboard, mouse and consumer control (eg: multimedia keys) and can
+be paired with up to 4 different devices.
 
 
 ## Build the Circuit
@@ -116,11 +118,42 @@ Use a serial monitor program to configure the device.  The following serial term
 
  *   `name <devicename>`          - set device name, takes effect after restart
  *   `setwifi <ssid> <password>`  - configure WiFi
- *   `status`                     - show device name, MAC, WiFi, IP
+ *   `status`                     - show device name, MAC, WiFi, IP, BLE pairing status
+ *   `pair <bleslot>`             - pair a BLE device with a specified slot
+ *   `unpair <bleslot>`           - unpair a BLE device slot
+ *   `connect <bleslot>`          - connect to the paired device for a slot
+ *   `nvsreset`                   - factory reset
+ *   `nvsdump`                    - dump keys in NVS
+ *   `reboot`                     - reboot the device
 
+
+## Pairing BLE Devices
+
+Up to 4 paired BLE devices are supported, but only one can be active at a time.  To pair a device:
+
+1. Connect using a serial monitor program
+2. Type `pair N` and the device will start advertising itself for pairing (eg: type `pair 0` for the first device)
+3. Go to the device to be paired and choose to pair it.
+4. You should see connected and authenicated messages in the serial terminal and then a message 
+   saying the device has been paired.
+5. Pair subsequent devices by typing `pair 1`, `pair 2` and `pair 3`
+
+To test connection, use the `connect N` command.   The paired device should automatically reconnect if available.  Use
+`connect -1` to disconnect all devices.  Once all devices are paired it's recommended to test switching the connection
+between all devices to ensure everything is setup correctly.
+
+Use the `unpair N` command to unpair a device - you should also unpair from the other device too. (eg: "forget this device", "remove device")
+
+The `status` command shows the public addresses for each of the virtual pairing slots, the address of any paired device and the
+connection status.
+
+Note: BLE can be a bit flakey during pairing.  Sometimes you might need to toggle bluetooth on/off on the device being paired
+to get it to initially connect.
 
 
 ## UDP Protocol
+
+### IR Transmit
 
 To transmit an IR signal, send a UDP packet to port 4210 in the following format:
 
@@ -148,9 +181,42 @@ Note: pronto IR code definitions usually include the `gap` as the last space in 
 
 
 
+### Connect BLE Device
+
+Before sending HID packets to a BLE device, the device first needs to be connected:
+
+* `uint16_t cmd` - must be 2
+* `uint8_t bleslot` - the BLE virtual device slot to connect
+
+Currently there's no network method to check if the connection succeeded.  Use the serial monitor to check status manually.
+
+
+
+### Send BLE HID Input Report
+
+Once a BLE device is connected, HID reports can be sent
+
+* `uint16_t cmd` - must be 3
+* `uint8_t bleslot` - the BLE virtual device slot to connect
+* `uint8_t reportId` - the kind of hid report to send
+* `uint8_t reportData[]` - the actual HID report
+
+The `reportId` and `reportData[]` should be
+
+* `reportId` = 1, `reportData[8]` - keyboard input report
+* `reportId` = 2, `reportData[2]` - consumer control report
+* `reportId` = 3, `reportData[4]` - mouse input report
+
+The format of the `reportData` is as per the BLE HID spec.  The length of the report data must be correct
+otherwise the packet will be dropped (check serial monitor if packets are not being delivered).
+
+
+
 ## NodeJS Library
 
 See [irtx-node](https://github.com/toptensoftware/irtx-node) for library.
+
+
 
 ## License
 
