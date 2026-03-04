@@ -27,6 +27,8 @@ NimBLEServer*         bleServer      = nullptr;
 NimBLEHIDDevice*      hidDevice      = nullptr;
 NimBLECharacteristic* keyboardReport = nullptr;
 NimBLECharacteristic* consumerReport = nullptr;
+NimBLECharacteristic* mouseReport = nullptr;
+
 
 // Peer addresses
 NimBLEAddress peerAddress;
@@ -38,7 +40,8 @@ bool isPairing = false;
 
 
 // ---- HID Report Descriptor: Keyboard (ID=1) + Consumer Control (ID=2) ----
-static const uint8_t hidReportDescriptor[] = {
+static const uint8_t hidReportDescriptor[] = 
+{
     // Keyboard — Report ID 1
     0x05, 0x01,        // Usage Page (Generic Desktop)
     0x09, 0x06,        // Usage (Keyboard)
@@ -64,6 +67,7 @@ static const uint8_t hidReportDescriptor[] = {
     0x29, 0x73,        //   Usage Maximum (115)
     0x81, 0x00,        //   Input (Data,Array,Abs) — 6 keycodes
     0xC0,              // End Collection
+
     // Consumer Control — Report ID 2
     0x05, 0x0C,        // Usage Page (Consumer)
     0x09, 0x01,        // Usage (Consumer Control)
@@ -77,6 +81,36 @@ static const uint8_t hidReportDescriptor[] = {
     0x95, 0x01,        //   Report Count (1)
     0x81, 0x00,        //   Input (Data,Array,Abs)
     0xC0,              // End Collection
+
+    // Mouse — Report ID 3
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x02,        // Usage (Mouse)
+    0xA1, 0x01,        // Collection (Application)
+    0x85, 0x03,        //   Report ID (3)
+    0x09, 0x01,        //   Usage (Pointer)
+    0xA1, 0x00,        //   Collection (Physical)
+    0x05, 0x09,        //     Usage Page (Buttons)
+    0x19, 0x01,        //     Usage Minimum (1)
+    0x29, 0x03,        //     Usage Maximum (3)
+    0x15, 0x00,        //     Logical Minimum (0)
+    0x25, 0x01,        //     Logical Maximum (1)
+    0x75, 0x01,        //     Report Size (1)
+    0x95, 0x03,        //     Report Count (3)
+    0x81, 0x02,        //     Input (Data,Var,Abs) — 3 buttons
+    0x75, 0x05,        //     Report Size (5)
+    0x95, 0x01,        //     Report Count (1)
+    0x81, 0x01,        //     Input (Const) — padding
+    0x05, 0x01,        //     Usage Page (Generic Desktop)
+    0x09, 0x30,        //     Usage (X)
+    0x09, 0x31,        //     Usage (Y)
+    0x09, 0x38,        //     Usage (Wheel)
+    0x15, 0x81,        //     Logical Minimum (-127)
+    0x25, 0x7F,        //     Logical Maximum (127)
+    0x75, 0x08,        //     Report Size (8)
+    0x95, 0x03,        //     Report Count (3)
+    0x81, 0x06,        //     Input (Data,Var,Rel) — X, Y, Wheel
+    0xC0,              //   End Collection
+    0xC0,              // End Collection    
 };
 
 // arduino-esp32 v3.3.7 checks btInUse() at startup; if false, it releases BT memory
@@ -255,6 +289,7 @@ void startServer(int slot)
     // Get reports
     keyboardReport = hidDevice->getInputReport(1);
     consumerReport = hidDevice->getInputReport(2);
+    mouseReport = hidDevice->getInputReport(3);
 
     // Start 
     hidDevice->startServices();
@@ -264,7 +299,7 @@ void startServer(int slot)
 
     // Initialize advertising
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-    adv->setAppearance(HID_KEYBOARD);
+    adv->setAppearance(GENERIC_HID);
     adv->setName(slotName);
     adv->addServiceUUID(hidDevice->getHidService()->getUUID());
     adv->setConnectableMode(BLE_GAP_CONN_MODE_UND);
@@ -530,8 +565,14 @@ void handleBleHidPacket(uint8_t* data, int length)
         consumerReport->setValue(reportData, reportLen);
         consumerReport->notify();
     }
+    else if (reportId == 3 && reportLen == 4) 
+    {
+        LOG("BLE: sending mouse report\n");
+        mouseReport->setValue(reportData, reportLen);
+        mouseReport->notify();
+    }
     else
     {
-        LOG("BLE: dropping unrecognized hid packet: reportId: %d length: %d\n", (int)reportId, (int)reportLen);
+        LOG("BLE: dropping unrecognized hid packet with reportId: %d length: %d\n", (int)reportId, (int)reportLen);
     }
 }
