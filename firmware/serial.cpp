@@ -6,6 +6,7 @@
 #include "wifi_udp.h"
 #include "serial.h"
 #include "ble.h"
+#include "esp_system.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -84,6 +85,20 @@ static void handleCommand(const char* line)
         statusDeviceName();
         statusWifi();
         statusBle();
+    }
+    else if (strcmp(line, "nvsdump") == 0)
+    {
+        nvsDump();
+    }
+    else if (strcmp(line, "nvsreset") == 0)
+    {
+        nvsReset();
+    }
+    else if (strcmp(line, "reboot") == 0)
+    {
+        Serial.printf("Rebooting...\n");
+        delay(500);
+        esp_restart();
     }
     else if (*line == '\0')
     {

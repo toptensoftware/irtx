@@ -19,3 +19,6 @@
 #define INPUT_MAX          256
 
 extern Preferences prefs;
+
+void nvsDump();
+void nvsReset();

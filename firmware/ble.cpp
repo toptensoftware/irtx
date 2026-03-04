@@ -4,12 +4,23 @@
 #include "esp_mac.h"
 #include "host/ble_hs.h"
 #include "host/ble_hs_id.h"
+#include "nvs.h"
 
 #include "config.h"
 #include "device.h"
 #include "ble.h"
 
 #define MAX_BLE_DEVICES     4
+
+/*
+Needs patched NimBLE library.
+
+C:\Users\YOURUSERNAME\Documents\Arduino\libraries\NimBLE-Arduino\src\nimble\nimble\host\store\config\src\ble_store_nvs.c
+
+//#define NIMBLE_NVS_NAMESPACE                     "nimble_bond"
+const char* NIMBLE_NVS_NAMESPACE = "nimble_bond";
+*/
+extern const char* NIMBLE_NVS_NAMESPACE;
 
 // BLE server
 NimBLEServer*         bleServer      = nullptr;
@@ -21,6 +32,7 @@ NimBLECharacteristic* consumerReport = nullptr;
 NimBLEAddress peerAddress;
 
 static char slotName[80];
+static char nvsName[15];
 int activeSlot = -1;
 bool isPairing = false;
 
@@ -183,7 +195,7 @@ class BleCallbacks : public NimBLEServerCallbacks
         {
             peerAddress = identityAddr;
             savePeerAddress(activeSlot, identityAddr);
-            LOG("BLE: slot %d paited to %s\n", activeSlot, identityAddr.toString().c_str());
+            LOG("BLE: slot %d paired to %s\n", activeSlot, identityAddr.toString().c_str());
             isPairing = false;
         }
     }
@@ -207,8 +219,11 @@ void startServer(int slot)
         return;
 
     sprintf(slotName, "%s-%i", deviceName, slot);
+    sprintf(nvsName, "nimble_bond_%i", slot);
+    NIMBLE_NVS_NAMESPACE = nvsName;
 
     LOG("BLE starting (%s)...\n", slotName);
+
 
     NimBLEDevice::init(slotName);
     NimBLEDevice::setSecurityAuth(true, true, true); // bonding=true, MITM=true, SC=true
@@ -399,8 +414,18 @@ void bleUnpair(int slot)
         stopServer();
     }
 
+    // Clear bond store for this slot
+    char sz[16];
+    sprintf(sz, "nimble_bond_%i", slot);
+    nvs_handle_t handle;
+    esp_err_t err = nvs_open(sz, NVS_READWRITE, &handle);
+    if (err == ESP_OK) {
+        nvs_erase_all(handle);
+        nvs_commit(handle);
+        nvs_close(handle);
+    }
+
     // Delete bond
-    NimBLEDevice::deleteBond(addr);
     clearPeerAddress(slot);
 
     LOG("Unpaired slot %d\n", slot);
