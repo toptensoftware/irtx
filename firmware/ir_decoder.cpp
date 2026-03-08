@@ -133,7 +133,7 @@ void IrDecoder::update_decode_repeat(bool pulse, int length)
                 m_repeatState = RepeatState::ExpectSpace;
                 if (m_repeatPos == 3)
                 {
-                    m_handler(m_protocol, 0);
+                    m_handler(m_protocol, 0xFFFFFFFFFFFFFFFF); // Repeat code
                     m_repeatState = RepeatState::ExpectPulse;
                     m_repeatPos = 0;
                 }
