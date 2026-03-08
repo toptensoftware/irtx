@@ -8,6 +8,7 @@
 #include "ble.h"
 #include "esp_system.h"
 #include "ir_protocol.h"
+#include "ir_router.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -95,6 +96,7 @@ static void handleCommand(const char* line)
         statusProtocols();
         statusWifi();
         statusBle();
+        statusRoutes();
     }
     else if (strcmp(line, "nvsdump") == 0)
     {

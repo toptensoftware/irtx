@@ -7,6 +7,7 @@
 #include "device.h"
 #include "ir_tx.h"
 #include "wifi_udp.h"
+#include "ir_router.h"
 #include "ble.h"
 
 WiFiUDP udp;
@@ -60,7 +61,8 @@ void handleUdpPacket(uint8_t* data, int length)
         case 1: handleIrPacket(data, length);      break;
         case 2: handleBleConnectPacket(data, length);     break;
         case 3: handleBleHidPacket(data, length);     break;
-        case 4: handleIrCodePacket(data, length);     break;
+        case 4: handleIrCodePacket(data, length);      break;
+        case 5: handleRoutePacket(data, length);       break;
         default: LOG("UDP: unknown command %d\n", cmd);
     }
 }
