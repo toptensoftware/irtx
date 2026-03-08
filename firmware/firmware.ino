@@ -17,6 +17,7 @@
 #include "ir_tx.h"
 #include "wifi_udp.h"
 #include "serial.h"
+#include "telnet.h"
 #include "ble.h";
 
 void setup()
@@ -41,5 +42,6 @@ void loop()
     pollSerial();
     pollIrRx();
     pollWifi();
+    pollTelnet();
     pollBle();
 }

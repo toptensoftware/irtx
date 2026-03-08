@@ -24,7 +24,7 @@ static int               rmtSymbolCount = 0;
 void setupIrTx()
 {
     if (IR_RX_PIN < 0) {
-        Serial.println("IR RX disabled (no pin assigned)");
+        LOG("IR TX disabled (no pin assigned)\n");
         return;
     }
 

@@ -100,24 +100,24 @@ void pollWifi()
 
 void statusWifi()
 {
-    Serial.println("--- WiFi ---");
+    PRINT("--- WiFi ---\n");
     prefs.begin("wifi", true);
     String ssid = prefs.getString("ssid", "(not set)");
     prefs.end();
-    Serial.printf("SSID        : %s\n", ssid.c_str());
+    PRINT("SSID        : %s\n", ssid.c_str());
     if (WiFi.status() == WL_CONNECTED)
     {
-        Serial.printf("IP address  : %s\n", WiFi.localIP().toString().c_str());
-        Serial.printf("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
-        Serial.printf("RSSI        : %d dBm\n", WiFi.RSSI());
+        PRINT("IP address  : %s\n", WiFi.localIP().toString().c_str());
+        PRINT("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
+        PRINT("RSSI        : %d dBm\n", WiFi.RSSI());
     }
     else
     {
-        Serial.println("Status      : disconnected");
+        PRINT("Status      : disconnected\n");
     }
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    Serial.printf("MAC (WiFi)  : %02X:%02X:%02X:%02X:%02X:%02X\n",
+    PRINT("MAC (WiFi)  : %02X:%02X:%02X:%02X:%02X:%02X\n",
                     mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
-    Serial.printf("UDP port    : %d\n", UDP_PORT);
+    PRINT("UDP port    : %d\n", UDP_PORT);
 }

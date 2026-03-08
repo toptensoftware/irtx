@@ -60,7 +60,7 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 void onDecoded(const IrProtocol& protocol, uint64_t data) {
-    Serial.printf("Decoded %s: 0x%016llX\n", protocol.name, data);
+    LOG("Decoded %s: 0x%016llX\n", protocol.name, data);
     applyRoutes(protocol.id, data);
 }
 
@@ -87,7 +87,7 @@ static void start_receive(void)
 void setupIrRx()
 {
     if (IR_RX_PIN < 0) {
-        Serial.println("IR RX disabled (no pin assigned)");
+        LOG("IR RX disabled (no pin assigned)\n");
         return;
     }
 

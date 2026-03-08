@@ -1,10 +1,13 @@
 #pragma once
 
 #include <Preferences.h>
+#include "log.h"
 
 // ---- Logging ----
-// Operational log messages prefixed with seconds since boot.
-#define LOG(fmt, ...) Serial.printf("[%7.3f] " fmt, millis() / 1000.0f, ##__VA_ARGS__)
+// Timestamped log — output goes to Serial and any connected telnet client.
+#define LOG(fmt, ...)   logWrite("[%7.3f] " fmt, millis() / 1000.0f, ##__VA_ARGS__)
+// Plain print — same fan-out as LOG but NOT recorded in dmesg. Use for command responses.
+#define PRINT(fmt, ...) printWrite(fmt, ##__VA_ARGS__)
 
 // ---- Hardware ----
 #define UDP_PORT     4210

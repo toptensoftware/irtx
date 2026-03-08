@@ -19,6 +19,6 @@ void setupDeviceName()
 
 void statusDeviceName()
 {
-    Serial.printf("--- Device ---\n");
-    Serial.printf("Name        : %s\n", deviceName);
+    PRINT("--- Device ---\n");
+    PRINT("Name        : %s\n", deviceName);
 }

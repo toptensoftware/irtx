@@ -6,6 +6,7 @@
 #include "wifi_udp.h"
 #include "serial.h"
 #include "ble.h"
+#include "log.h"
 #include "esp_system.h"
 #include "ir_protocol.h"
 #include "ir_router.h"
@@ -14,7 +15,7 @@ static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
 static bool lastWasCR = false;
 
-static void handleCommand(const char* line)
+void handleCommand(const char* line)
 {
     while (*line == ' ') line++;
 
@@ -98,6 +99,10 @@ static void handleCommand(const char* line)
         statusBle();
         statusRoutes();
     }
+    else if (strcmp(line, "dmesg") == 0)
+    {
+        dmesgPrint();
+    }
     else if (strcmp(line, "nvsdump") == 0)
     {
         nvsDump();
@@ -108,7 +113,7 @@ static void handleCommand(const char* line)
     }
     else if (strcmp(line, "reboot") == 0)
     {
-        Serial.printf("Rebooting...\n");
+        PRINT("Rebooting...\n");
         delay(500);
         esp_restart();
     }
@@ -119,7 +124,7 @@ static void handleCommand(const char* line)
     else
     {
         LOG("Unknown command: %s\n", line);
-        LOG("Commands: setwifi <ssid> <password> | name <devicename> | pair <0-3> | unpair <0-3> | status\n");
+        LOG("Commands: setwifi <ssid> <password> | name <devicename> | pair <0-3> | unpair <0-3> | status | dmesg\n");
     }
 }
 

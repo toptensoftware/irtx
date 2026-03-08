@@ -369,33 +369,33 @@ void pollBle()
 
 void statusBle()
 {
-    Serial.println("--- BLE ---");
+    PRINT("--- BLE ---\n");
 
-    for (int i = 0; i < MAX_BLE_DEVICES; i++) 
+    for (int i = 0; i < MAX_BLE_DEVICES; i++)
     {
-        ble_addr_t mac;       
+        ble_addr_t mac;
         generate_slot_address(i, &mac);
 
-        Serial.printf("Slot %d      : id: %02X:%02X:%02X:%02X:%02X:%02X",
+        PRINT("Slot %d      : id: %02X:%02X:%02X:%02X:%02X:%02X",
                 i, mac.val[5], mac.val[4], mac.val[3], mac.val[2], mac.val[1], mac.val[0]);
 
         NimBLEAddress addr;
         if (loadPeerAddress(i, addr))
         {
             auto val = addr.getVal();
-            Serial.printf("  peer: %02X:%02X:%02X:%02X:%02X:%02X",
+            PRINT("  peer: %02X:%02X:%02X:%02X:%02X:%02X",
                  val[5], val[4], val[3], val[2], val[1], val[0]);
         }
 
         if (i == activeSlot)
         {
             if (bleServer->getConnectedCount() > 0)
-                Serial.printf(" Connected");
+                PRINT(" Connected");
             else if (NimBLEDevice::getAdvertising()->isAdvertising())
-                Serial.printf(" Advertising");
+                PRINT(" Advertising");
         }
 
-        Serial.printf("\n");
+        PRINT("\n");
     }
 }
 

@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "ir_protocol.h"
+#include "config.h"
 
 constexpr IrProtocol protocolNec {
     "nec",
@@ -72,10 +73,10 @@ const IrProtocol* getIrProtocolByIndex(int index)
 
 void statusProtocols()
 {
-    Serial.printf("--- IR protocols (%d) ---\n", registeredProtocolCount);
+    PRINT("--- IR protocols (%d) ---\n", registeredProtocolCount);
     for (int i = 0; i < registeredProtocolCount; i++)
     {
         const IrProtocol* p = registeredProtocols[i];
-        Serial.printf("  %-8s  : id: 0x%08X bits: %d\n", p->name, p->id, p->bitCount);
+        PRINT("  %-8s  : id: 0x%08X bits: %d\n", p->name, p->id, p->bitCount);
     }
 }

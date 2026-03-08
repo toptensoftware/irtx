@@ -105,21 +105,21 @@ void applyRoutes(uint32_t srcProtocol, uint64_t srcCode)
 
 void statusRoutes()
 {
-    Serial.printf("--- IR routes (%d) ---\n", routeCount);
+    PRINT("--- IR routes (%d) ---\n", routeCount);
     for (int i = 0; i < routeCount; i++) {
         const IrRoute& r = routes[i];
         if (r.dstProtocol == 0) {
-            Serial.printf("  0x%08X:0x%016llX -> suppress\n",
+            PRINT("  0x%08X:0x%016llX -> suppress\n",
                 r.srcProtocol, r.srcCode);
         } else if (r.dstIp == 0) {
-            Serial.printf("  0x%08X:0x%016llX -> local 0x%08X:0x%016llX\n",
+            PRINT("  0x%08X:0x%016llX -> local 0x%08X:0x%016llX\n",
                 r.srcProtocol, r.srcCode, r.dstProtocol, r.dstCode);
         } else {
             IPAddress ip(r.dstIp & 0xFF,
                          (r.dstIp >> 8)  & 0xFF,
                          (r.dstIp >> 16) & 0xFF,
                          (r.dstIp >> 24) & 0xFF);
-            Serial.printf("  0x%08X:0x%016llX -> %s 0x%08X:0x%016llX\n",
+            PRINT("  0x%08X:0x%016llX -> %s 0x%08X:0x%016llX\n",
                 r.srcProtocol, r.srcCode, ip.toString().c_str(), r.dstProtocol, r.dstCode);
         }
     }

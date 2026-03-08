@@ -17,7 +17,7 @@ void nvsDump()
         nvs_entry_info_t info;
         nvs_entry_info(it, &info);
         
-        Serial.printf("Namespace: %-16s | Key: %-16s | Type: %d\n",
+        PRINT("Namespace: %-16s | Key: %-16s | Type: %d\n",
                info.namespace_name, info.key, info.type);
         
         res = nvs_entry_next(&it);
@@ -28,11 +28,11 @@ void nvsDump()
 
 void nvsReset()
 {
-    Serial.printf("Erasing NVS...\n");
+    PRINT("Erasing NVS...\n");
     nvs_flash_erase();
-    nvs_flash_init();        
+    nvs_flash_init();
 
-    Serial.printf("Rebooting...\n");
+    PRINT("Rebooting...\n");
     delay(500);
     esp_restart();
 }
