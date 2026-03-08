@@ -7,6 +7,7 @@
 #include "serial.h"
 #include "ble.h"
 #include "esp_system.h"
+#include "ir_protocol.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -80,9 +81,18 @@ static void handleCommand(const char* line)
     {
         bleConnect(atoi(line + 8));
     }
+    else if (strncmp(line, "led ", 4) == 0)
+    {
+        int r, g, b;
+        if (sscanf(line + 4, "%d %d %d", &r, &g, &b) == 3)
+            ledColor((uint8_t)r, (uint8_t)g, (uint8_t)b);
+        else
+            LOG("Usage: led <r> <g> <b>\n");
+    }
     else if (strcmp(line, "status") == 0)
     {
         statusDeviceName();
+        statusProtocols();
         statusWifi();
         statusBle();
     }

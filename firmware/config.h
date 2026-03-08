@@ -8,8 +8,15 @@
 
 // ---- Hardware ----
 #define UDP_PORT     4210
+#ifdef CONFIG_IDF_TARGET_ESP32C6
+#define IR_TX_PIN    11
+#define IR_RX_PIN    10
+#define LED_PIN      8        // Onboard WS2812 RGB LED
+#else
 #define IR_TX_PIN    4
+#define IR_RX_PIN    -1
 #define LED_PIN      10       // Onboard WS2812 RGB LED
+#endif
 #define CARRIER_FREQ 38000   // 38kHz IR carrier
 
 // ---- Limits ----

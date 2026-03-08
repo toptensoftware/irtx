@@ -2,5 +2,13 @@
 
 set -e
 
+case "$1" in
+  c3) FQBN=esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app ;;
+  c6) FQBN=esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=huge_app ;;
+  *) echo "Usage: $0 <c3|c6> <port>"; exit 1 ;;
+esac
+
+if [ -z "$2" ]; then echo "Usage: $0 <c3|c6> <port>"; exit 1; fi
+
 # Upload
-arduino-cli upload --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app --port $1 .
+arduino-cli upload --fqbn $FQBN --port $2 .

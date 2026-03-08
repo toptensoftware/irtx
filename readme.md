@@ -95,7 +95,11 @@ The firmware for the esp32 is an Arduino project.  To build
 
     ```bash
     arduino-cli lib install "Adafruit NeoPixel"
+    #arduino-cli lib install "NimBLE-Arduino"
     ```
+
+    Also, there needs to be a small patch made to NimBLE, 
+    see [ble.cpp](./firmware/ble.cpp).
 
 4. Build
 

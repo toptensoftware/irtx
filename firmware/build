@@ -14,7 +14,42 @@ set -e
 ## Find Port
 #arduino-cli board list
 
-# Compile
-arduino-cli compile --fqbn esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app .  $*
+DO_BUILD=false
+DO_FLASH=false
+DO_CLEAN=false
+BOARD=
+PORT=
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --build) DO_BUILD=true ;;
+    --flash) DO_FLASH=true ;;
+    --clean) DO_CLEAN=true ;;
+    c3|c6)   BOARD=$1 ;;
+    *)       PORT=$1 ;;
+  esac
+  shift
+done
+
+if [ -z "$BOARD" ]; then echo "Usage: $0 [--build] [--flash] <c3|c6> [<port>]"; exit 1; fi
+
+# If neither flag given, do both
+if ! $DO_BUILD && ! $DO_FLASH; then DO_BUILD=true; DO_FLASH=true; fi
+
+case "$BOARD" in
+  c3) FQBN=esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app ;;
+  c6) FQBN=esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=huge_app ;;
+esac
+
+if $DO_BUILD; then
+  CLEAN_FLAG=""
+  $DO_CLEAN && CLEAN_FLAG="--clean"
+  arduino-cli compile --fqbn $FQBN $CLEAN_FLAG .
+fi
+
+if $DO_FLASH; then
+  if [ -z "$PORT" ]; then echo "Error: port required for flash"; exit 1; fi
+  arduino-cli upload --fqbn $FQBN --port $PORT .
+fi
 
 
