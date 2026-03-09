@@ -528,6 +528,8 @@ void handleBleConnectPacket(uint8_t* data, int length)
     }
     uint8_t bleDevIdx = data[2];
 
+    VERBOSE("ble: connecting to %i...\n", bleDevIdx);
+
     if (bleDevIdx < MAX_BLE_DEVICES)
         bleConnect(bleDevIdx);
     else
@@ -564,19 +566,25 @@ void handleBleHidPacket(uint8_t* data, int length)
 
     if (reportId == 1 && reportLen == 8) 
     {
-        LOG("BLE: sending keyboard report\n");
+        VERBOSE("BLE: sending keyboard report (%02x %02x %02x %02x %02x %02x %02x %02x)\n",
+            reportData[0], reportData[1], reportData[2], reportData[3],
+            reportData[4], reportData[5], reportData[6], reportData[7]
+            );
+
         keyboardReport->setValue(reportData, reportLen);
         keyboardReport->notify();
     } 
     else if (reportId == 2 && reportLen == 2) 
     {
-        LOG("BLE: sending consumer report\n");
+        VERBOSE("BLE: sending consumer report (%02x %02x)\n", reportData[0], reportData[1]);
+
         consumerReport->setValue(reportData, reportLen);
         consumerReport->notify();
     }
     else if (reportId == 3 && reportLen == 4) 
     {
-        LOG("BLE: sending mouse report\n");
+        VERBOSE("BLE: sending mouse report (%02x %02x %02x %02x)\n", reportData[0], reportData[1], reportData[2], reportData[3]);
+        
         mouseReport->setValue(reportData, reportLen);
         mouseReport->notify();
     }

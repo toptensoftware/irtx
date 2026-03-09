@@ -111,6 +111,31 @@ void handleCommand(const char* line)
     {
         nvsReset();
     }
+    else if (strncmp(line, "verbose ", 8) == 0)
+    {
+        const char* arg = line + 8;
+        while (*arg == ' ') arg++;
+        if (strcmp(arg, "on") == 0)
+        {
+            logSetVerbose(true);
+            prefs.begin("device", false);
+            prefs.putBool("verbose", true);
+            prefs.end();
+            LOG("Verbose logging on\n");
+        }
+        else if (strcmp(arg, "off") == 0)
+        {
+            logSetVerbose(false);
+            prefs.begin("device", false);
+            prefs.putBool("verbose", false);
+            prefs.end();
+            LOG("Verbose logging off\n");
+        }
+        else
+        {
+            PRINT("Usage: verbose on|off\n");
+        }
+    }
     else if (strcmp(line, "reboot") == 0)
     {
         PRINT("Rebooting...\n");

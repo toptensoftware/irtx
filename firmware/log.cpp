@@ -118,3 +118,25 @@ void printWrite(const char* fmt, ...)
     if (len > 0)
         logWriteRaw(buf, (size_t)len);
 }
+
+// ---- Verbose mode ----
+
+static bool logVerbose = false;
+
+void logSetVerbose(bool verbose) { logVerbose = verbose; }
+bool logGetVerbose()             { return logVerbose; }
+
+void verboseWrite(const char* fmt, ...)
+{
+    if (!logVerbose) return;
+    char buf[512];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if (len > 0)
+    {
+        dmesgFeed(buf, (size_t)len);
+        logWriteRaw(buf, (size_t)len);
+    }
+}

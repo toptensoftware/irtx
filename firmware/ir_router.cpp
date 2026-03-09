@@ -59,20 +59,25 @@ void handleRoutePacket(uint8_t* data, int length)
 
 void applyRoutes(uint32_t srcProtocol, uint64_t srcCode)
 {
-    for (int i = 0; i < routeCount; i++) {
+    for (int i = 0; i < routeCount; i++) 
+    {
         const IrRoute& r = routes[i];
         if (r.srcProtocol != srcProtocol || r.srcCode != srcCode)
             continue;
 
-        if (r.dstProtocol == 0) {
+        VERBOSE("Routing: 0x%08X:0x%016llX\n", srcProtocol, srcCode);
+
+        if (r.dstProtocol == 0) 
+        {
             // Suppress — log and skip
-            LOG("Route: suppress 0x%08X:0x%016llX\n", srcProtocol, srcCode);
+            VERBOSE(" - suppressed\n");
             continue;
         }
 
-        if (r.dstIp == 0) {
+        if (r.dstIp == 0) 
+        {
             // Local retransmit
-            LOG("Route: local TX 0x%08X:0x%016llX\n", r.dstProtocol, r.dstCode);
+            VERBOSE(" - local TX 0x%08X:0x%016llX\n", r.dstProtocol, r.dstCode);
             handleIrCode(0, r.dstProtocol, r.dstCode, false);
             continue;
         }
@@ -94,7 +99,7 @@ void applyRoutes(uint32_t srcProtocol, uint64_t srcCode)
                      (r.dstIp >> 8)  & 0xFF,
                      (r.dstIp >> 16) & 0xFF,
                      (r.dstIp >> 24) & 0xFF);
-        LOG("Route: remote TX to %s 0x%08X:0x%016llX\n", ip.toString().c_str(), r.dstProtocol, r.dstCode);
+        VERBOSE(" - remote TX to %s 0x%08X:0x%016llX\n", ip.toString().c_str(), r.dstProtocol, r.dstCode);
         udp.beginPacket(ip, UDP_PORT);
         udp.write(pkt, sizeof(pkt));
         udp.endPacket();
@@ -106,15 +111,21 @@ void applyRoutes(uint32_t srcProtocol, uint64_t srcCode)
 void statusRoutes()
 {
     PRINT("--- IR routes (%d) ---\n", routeCount);
-    for (int i = 0; i < routeCount; i++) {
+    for (int i = 0; i < routeCount; i++) 
+    {
         const IrRoute& r = routes[i];
-        if (r.dstProtocol == 0) {
+        if (r.dstProtocol == 0) 
+        {
             PRINT("  0x%08X:0x%016llX -> suppress\n",
                 r.srcProtocol, r.srcCode);
-        } else if (r.dstIp == 0) {
+        } 
+        else if (r.dstIp == 0) 
+        {
             PRINT("  0x%08X:0x%016llX -> local 0x%08X:0x%016llX\n",
                 r.srcProtocol, r.srcCode, r.dstProtocol, r.dstCode);
-        } else {
+        } 
+        else 
+        {
             IPAddress ip(r.dstIp & 0xFF,
                          (r.dstIp >> 8)  & 0xFF,
                          (r.dstIp >> 16) & 0xFF,

@@ -1,11 +1,16 @@
 # irtx
 
-A simple, open source, Wifi enabled infrared transmitter (ie: an "IR Blaster") and BLE HID transmitter
+An open source, Wifi enabled IR Blaster and BLE HID transmitter.
+
+Features:
+
+* Receives IR timing over UDP and transmits using attached IR transmitter
+* Can receive either raw timing data, or NEC or Panasonic encoded values
+* Can receive and decode IR signals, remap and re-transmit either locally, or send via UDP for retransmission
+  on a second irtx device.
+* Can be paired with up to 4 BLE devices and can send keyboard, mouse or consumer control HID packets
 
 ![Final](./photos/final.jpeg)
-
-As a BLE blaster the device appears as a keyboard, mouse and consumer control (eg: multimedia keys) and can
-be paired with up to 4 different devices.
 
 
 ## Build the Circuit
@@ -105,16 +110,34 @@ The firmware for the esp32 is an Arduino project.  To build
 
     ```bash
     cd firmware
-    ./build
+    ./build --build c3
     ```
 
-5. Flash (replace com7 with your serial port)
+5. Flash (replace com8 with your serial port)
 
     ```bash
-    ./flash com7
+    ./build --flash c3 com8
     ```
 
 
+The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.  Note the GPIO pins are different
+for C6:
+
+```c
+// C6
+#define IR_TX_PIN    11
+#define IR_RX_PIN    10
+```
+
+vs
+
+```c
+// C3
+#define IR_TX_PIN    4
+#define IR_RX_PIN    5
+```
+
+Or, adjust in [config.h](firmware/config.h).
 
 ## Configuring Device
 
@@ -129,16 +152,22 @@ Use a serial monitor program to configure the device.  The following serial term
  *   `nvsreset`                   - factory reset
  *   `nvsdump`                    - dump keys in NVS
  *   `reboot`                     - reboot the device
+ *   `dmesg`                      - displays the message log (up to 50 past logged messages)
+ *   `verbose on|off`             - enable or disable verbose logging (persisted across reboots)
+
+Once wifi is enabled and working you can also use telnet to configure and monitor the device with the
+same commands as above.
+
 
 
 ## Pairing BLE Devices
 
 Up to 4 paired BLE devices are supported, but only one can be active at a time.  To pair a device:
 
-1. Connect using a serial monitor program
+1. Connect using a serial monitor program or telnet
 2. Type `pair N` and the device will start advertising itself for pairing (eg: type `pair 0` for the first device)
 3. Go to the device to be paired and choose to pair it.
-4. You should see connected and authenicated messages in the serial terminal and then a message 
+4. You should see connected and authenicated messages in the terminal and then a message 
    saying the device has been paired.
 5. Pair subsequent devices by typing `pair 1`, `pair 2` and `pair 3`
 
@@ -192,7 +221,7 @@ Before sending HID packets to a BLE device, the device first needs to be connect
 * `uint16_t cmd` - must be 2
 * `uint8_t bleslot` - the BLE virtual device slot to connect
 
-Currently there's no network method to check if the connection succeeded.  Use the serial monitor to check status manually.
+Currently there's no network method to check if the connection succeeded.  Use the serial or telnet monitor to check status manually.
 
 
 
@@ -212,7 +241,59 @@ The `reportId` and `reportData[]` should be
 * `reportId` = 3, `reportData[4]` - mouse input report
 
 The format of the `reportData` is as per the BLE HID spec.  The length of the report data must be correct
-otherwise the packet will be dropped (check serial monitor if packets are not being delivered).
+otherwise the packet will be dropped (check serial/telnet monitor if packets are not being delivered).
+
+
+
+### Transmit IR Code
+
+To transmit an IR signal using a named protocol, send a UDP packet to port 4210 in the following format:
+
+* `uint16_t cmd` - must be 4
+* `uint16_t deviceIndex` - a user defined device index from 0 - 15 (same semantics as cmd 1)
+* `uint32_t protocolId` - identifies the IR protocol (see below)
+* `uint64_t code` - the IR code value to transmit
+* `uint8_t repeat` - if non-zero, sends the protocol's repeat frame instead of a full code frame
+
+(all values are little endian)
+
+The device encodes `code` according to the named protocol and transmits it.  The trailing gap is determined by the protocol definition.
+
+Supported protocol IDs are 4-character RIFF-style codes:
+
+| Protocol   | ID bytes (`protocolId` little-endian) | Bits |
+|------------|---------------------------------------|------|
+| NEC        | `4E 45 43 20` (`0x2043454E`)          | 32   |
+| Panasonic  | `50 41 4E 41` (`0x414E4150`)          | 48   |
+
+If `repeat` is non-zero and the protocol defines a repeat frame, the repeat frame is sent instead of encoding `code`.  NEC defines a repeat frame; Panasonic does not.
+
+
+
+### Set IR Route Table
+
+The device can receive IR signals, look them up in a route table, and re-transmit them — either locally or forwarded to another irtx device over UDP.  The route table is set by sending a UDP packet to port 4210 in the following format:
+
+* `uint16_t cmd` - must be 5
+* `uint16_t count` - number of route entries that follow
+* Route entries, repeated `count` times (28 bytes each, all fields little-endian):
+  * `uint32_t srcProtocol` - protocol ID of the incoming IR code to match
+  * `uint64_t srcCode` - IR code value to match
+  * `uint32_t dstProtocol` - protocol ID to use for retransmission (0 = suppress)
+  * `uint64_t dstCode` - IR code value to retransmit
+  * `uint32_t dstIp` - destination IP address (0 = local retransmit)
+
+This packet **replaces the entire route table** — send `count=0` to clear all routes.
+
+The maximum number of routes is 64.
+
+When an IR signal is received and decoded, its protocol and code are looked up against the table:
+
+* **`dstProtocol == 0`** — suppress: the signal is silently dropped.
+* **`dstIp == 0`** — local retransmit: the device transmits `dstProtocol:dstCode` via its own IR transmitter.
+* **`dstIp != 0`** — remote forward: the device sends a cmd=4 UDP packet to the specified IP address on port 4210, which causes the remote irtx device to transmit `dstProtocol:dstCode`.
+
+`dstIp` is stored little-endian with the first octet in the least-significant byte.  For example, `192.168.1.100` is encoded as `0x6401A8C0`.
 
 
 

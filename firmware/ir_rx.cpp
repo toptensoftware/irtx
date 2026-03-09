@@ -60,7 +60,7 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 void onDecoded(const IrProtocol& protocol, uint64_t data) {
-    LOG("Decoded %s: 0x%016llX\n", protocol.name, data);
+    VERBOSE("Decoded %s: 0x%016llX\n", protocol.name, data);
     applyRoutes(protocol.id, data);
 }
 

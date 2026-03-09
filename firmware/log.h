@@ -17,3 +17,8 @@ void dmesgPrint();
 
 // Called by telnet.cpp when a client connects or disconnects.
 void logSetTelnetFd(int fd);
+
+// Verbose mode — logWrite only if verbose is on. Recorded in dmesg.
+void verboseWrite(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
+void logSetVerbose(bool verbose);
+bool logGetVerbose();

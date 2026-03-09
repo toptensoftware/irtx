@@ -96,6 +96,8 @@ static void transmitTimings(uint16_t irDevIdx, uint16_t* timings, int count, uin
         count++;
     }
 
+    VERBOSE("IR TX: dev: %i timings: [%i] gap: %i\n", (int)irDevIdx, count, gap);
+
     // Sum up the total length
     int timingLength = 0;
     for (int i = 0; i < count; i++)
@@ -217,6 +219,8 @@ void handleIrCode(uint16_t irDevIdx, uint32_t protocolId, uint64_t code, bool re
         LOG("IR: encode produced no timings\n");
         return;
     }
+
+    VERBOSE("IR TX:  dev: %i protocol: 0x%08X code: 0x%016llX repeat: %i\n", (int)irDevIdx, protocolId, code, repeat ? 1 : 0);
 
     transmitTimings(irDevIdx, timingValues, count, (uint32_t)gap);
 }
