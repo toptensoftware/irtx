@@ -1,14 +1,14 @@
 # irtx
 
-An open source, Wifi enabled IR Blaster and BLE HID transmitter.
+An open source, Wifi enabled IR Blaster, IR Router and BLE HID Blaster.
 
 Features:
 
-* Receives IR timing over UDP and transmits using attached IR transmitter
-* Can receive either raw timing data, or NEC or Panasonic encoded values
+* Receives IR commands over UDP and transmits using attached IR transmitter
+* Accepts either raw timing data, or NEC or Panasonic encoded values
 * Can receive and decode IR signals, remap and re-transmit either locally, or send via UDP for retransmission
-  on a second irtx device.
-* Can be paired with up to 4 BLE devices and can send keyboard, mouse or consumer control HID packets
+  on a second irtx device or other UDP host.
+* Can be paired with up to 4 BLE devices to can send keyboard, mouse or consumer control HID packets
 
 ![Final](./photos/final.jpeg)
 
@@ -46,6 +46,8 @@ Notes:
 
 
 ## Print the Case
+
+This case supports IR transmitter circuitry only.  A version with IR receiver is not yet available.
 
 ![case](./case/case.png)
 
@@ -183,6 +185,24 @@ connection status.
 Note: BLE can be a bit flakey during pairing.  Sometimes you might need to toggle bluetooth on/off on the device being paired
 to get it to initially connect.
 
+## Notes IR Remapping
+
+The device can receive and NEC and Panasonic IR transmissions, map them to a different IR protocol/code and then either
+re-transmit locally from the same device, or send the remapped code to a second irtx device for transmission.
+
+Care needs to be taken when using this in the same room since overlapping IR codes will typically fail if a device
+receives IR transmissions from two devices at the same time.
+
+There are two use cases where this is useful:
+
+1. In the same room by blocking a device's IR receiver with a hood containing and IR LED connected to an irtx device.  This blocks the 
+  device from seeing IR from a remote but allows the irtx device to still control it.
+
+2. Transmitting received IR codes to a separate room.
+
+Case 1 is the most interesting as it allows IR signals to a device to be intercepted, remapped and either passed through
+or used for secondary functions.  eg: with appropriate controlling software this could be used to convert a regular DVR 
+remote into a universal remote for a home theatre.
 
 ## UDP Protocol
 
