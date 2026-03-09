@@ -66,7 +66,7 @@ void ir_encode(const IrProtocol& protocol, uint64_t code, bool repeat, uint16_t*
     ir_encode(protocol, code, repeat, signal32, count);
 
     // Pack down to 16-bit and extract final gap (which may not fit in 16 bits)
-    *count--; // Exclude the final gap from count
+    (*count)--; // Exclude the final gap from count
     for (int i = 0; i < *count; i++)
     {
         signal[i] = (uint16_t)signal32[i];
