@@ -107,17 +107,19 @@ The firmware for the esp32 is an Arduino project.  To build
     #arduino-cli lib install "NimBLE-Arduino"
     ```
 
-    Also, there needs to be a small patch made to NimBLE, 
-    see [ble.cpp](./firmware/ble.cpp).
+4. Patch NumBLE.  
 
-4. Build
+    In order to support multiple virtual BLE devices a small change needs to be made 
+    to the NimBLE library. See the comment at the top of [ble.cpp](./firmware/ble.cpp).
+
+5. Build
 
     ```bash
     cd firmware
     ./build --build c3
     ```
 
-5. Flash (replace com8 with your serial port)
+6. Flash (replace com8 with your serial port)
 
     ```bash
     ./build --flash c3 com8
