@@ -145,7 +145,7 @@ vs
 
 Or, adjust in [config.h](firmware/config.h).
 
-## Configuring Device
+## Configuring the Device
 
 Use a serial monitor program to configure the device.  The following serial terminal commands are available:
 
@@ -161,9 +161,13 @@ Use a serial monitor program to configure the device.  The following serial term
  *   `dmesg`                      - displays the message log (up to 50 past logged messages)
  *   `verbose on|off`             - enable or disable verbose logging (persisted across reboots)
 
+
+## Telnet Support
+
 Once wifi is enabled and working you can also use telnet to configure and monitor the device with the
 same commands as above.
 
+Note: only one telnet client can connect at a time.
 
 
 ## Pairing BLE Devices
