@@ -195,20 +195,26 @@ re-transmit locally from the same device, or send the remapped code to a second 
 Care needs to be taken when using this in the same room since overlapping IR codes will typically fail if a device
 receives IR transmissions from two devices at the same time.
 
-There are two use cases where this is useful:
+There are severak use cases for this:
 
 1. In the same room by blocking a device's IR receiver with a hood containing an IR LED connected to an irtx device.  This blocks the 
   device from seeing IR from a remote while still allowing the irtx device to control it.
 
-  This allows IR signals to a device to be intercepted, remapped and either passed through or used for secondary functions.  
+    This allows IR signals to a device to be intercepted, remapped and either passed through or used for secondary functions.  
   
-  eg: with appropriate controlling software this could be used to convert a regular DVR remote into a universal remote for a home theatre.
+    eg: with appropriate controlling software this could be used to convert a regular DVR remote into a universal remote for a home theatre.
 
 2. Transmitting received IR codes to a separate room.
+
+3. Transmitting received IR codes to other non-irtx machine.
 
 
 
 ## UDP Protocol
+
+The following describes the UDP protocol for communicating with the device.
+
+Node.js clients can use the [irtx-node](https://github.com/toptensoftware/irtx-node) library.
 
 ### IR Transmit
 
@@ -320,10 +326,6 @@ When an IR signal is received and decoded, its protocol and code are looked up a
 `dstIp` is stored little-endian with the first octet in the least-significant byte.  For example, `192.168.1.100` is encoded as `0x6401A8C0`.
 
 
-
-## NodeJS Library
-
-See [irtx-node](https://github.com/toptensoftware/irtx-node) for library.
 
 
 
