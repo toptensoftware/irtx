@@ -16,6 +16,9 @@ extern "C" {
 #define OP_LED             7
 #define OP_SWITCH_ACTIVITY 8
 
+// ---- Binding type codes (match binpack.js) ----
+#define BINDING_TYPE_IR    1
+
 // ---- Device limits ----
 #define MAX_ACTIVITIES_DEVICES 32
 
@@ -33,6 +36,7 @@ typedef struct delayOp delayOp;
 typedef struct ledOp ledOp;
 typedef struct switchActivityOp switchActivityOp;
 typedef struct binding binding;
+typedef struct bindingIr bindingIr;
 
 
 // activitiesRoot
@@ -62,7 +66,7 @@ struct __attribute__((packed)) activity
 	/*    4 */	uint32_t devices_count;
 	/*    8 */	int32_t* devices;
 	/*   12 */	uint32_t bindings_count;
-	/*   16 */	binding* bindings;
+	/*   16 */	binding** bindings;
 	/*   20 */	uint32_t willActivateOps_count;
 	/*   24 */	op** willActivateOps;
 	/*   28 */	uint32_t didActivateOps_count;
@@ -149,11 +153,18 @@ struct __attribute__((packed)) switchActivityOp
 // binding
 struct __attribute__((packed)) binding
 {
-	/*    0 */	uint32_t protocol;
-	/*    4 */	uint64_t modifier;
-	/*   12 */	uint64_t value;
-	/*   20 */	uint32_t ops_count;
-	/*   24 */	op** ops;
+	/*    0 */	uint32_t type;
+};
+
+// bindingIr
+struct __attribute__((packed)) bindingIr
+{
+	/*    0 */	binding base;
+	/*    4 */	uint32_t protocol;
+	/*    8 */	uint64_t modifier;
+	/*   16 */	uint64_t value;
+	/*   24 */	uint32_t ops_count;
+	/*   28 */	op** ops;
 };
 
 #ifdef __cplusplus

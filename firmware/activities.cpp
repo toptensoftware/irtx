@@ -371,14 +371,16 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
     {
         for (uint32_t i = 0; i < act->bindings_count; i++)
         {
-            binding* b = &act->bindings[i];
-            if (b->protocol == protocol &&
-                b->modifier  == s_modifierValue &&
-                b->value     == value)
+            binding* b = act->bindings[i];
+            if (b->type != BINDING_TYPE_IR) continue;
+            bindingIr* bir = (bindingIr*)b;
+            if (bir->protocol == protocol &&
+                bir->modifier  == s_modifierValue &&
+                bir->value     == value)
             {
                 VERBOSE("Activities: modifier+key binding matched\n");
                 s_modifierProtocol = 0;
-                enqueueOps(b->ops, b->ops_count);
+                enqueueOps(bir->ops, bir->ops_count);
                 return;
             }
         }
@@ -387,11 +389,13 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
     // 2. Look for an unmodified binding.
     for (uint32_t i = 0; i < act->bindings_count; i++)
     {
-        binding* b = &act->bindings[i];
-        if (b->protocol == protocol && b->modifier == 0 && b->value == value)
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_IR) continue;
+        bindingIr* bir = (bindingIr*)b;
+        if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value)
         {
             VERBOSE("Activities: binding matched\n");
-            enqueueOps(b->ops, b->ops_count);
+            enqueueOps(bir->ops, bir->ops_count);
             return;
         }
     }
@@ -399,8 +403,10 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
     // 3. Check if this key acts as a modifier for any binding in this activity.
     for (uint32_t i = 0; i < act->bindings_count; i++)
     {
-        binding* b = &act->bindings[i];
-        if (b->modifier != 0 && b->protocol == protocol && b->modifier == value)
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_IR) continue;
+        bindingIr* bir = (bindingIr*)b;
+        if (bir->modifier != 0 && bir->protocol == protocol && bir->modifier == value)
         {
             VERBOSE("Activities: modifier key armed 0x%016llX (timeout %ds)\n",
                     value, MODIFIER_TIMEOUT_MS / 1000);

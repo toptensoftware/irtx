@@ -7,6 +7,8 @@ const cmdDelay = 6;
 const cmdLed = 7;
 const cmdSwitchActivity = 8;
 
+const bindingTypeIr = 1;
+
 
 let types = [
 
@@ -39,7 +41,7 @@ let types = [
         { name: "devices", type: "length" },
         { name: "devices", type: "int*" },
         { name: "bindings", type: "length" },
-        { name: "bindings", type: "binding*", default: [] },
+        { name: "bindings", type: "binding**", default: [] },
         { name: "willActivateOps", type: "length" },
         { name: "willActivateOps", type: "op**", default: [] },
         { name: "didActivateOps", type: "length" },
@@ -147,6 +149,20 @@ let types = [
 
 {
     name: "binding",
+    resolveAbstractType: (val) => {
+        switch (val.type)
+        {
+            case bindingTypeIr: return "bindingIr";
+        }
+    },
+    fields: [
+        { name: "type", type: "uint" },
+    ]
+},
+
+{
+    name: "bindingIr",
+    baseType: "binding",
     fields: [
         { name: "protocol", type: "uint" },             // protocol name (riff)
         { name: "modifier", type: "ulong" },            // zero for non-modified
