@@ -18,7 +18,10 @@
 #include "wifi_udp.h"
 #include "serial.h"
 #include "telnet.h"
-#include "ble.h";
+#include "ble.h"
+#include "filesystem.h"
+#include "http.h"
+#include "activities.h"
 
 void setup()
 {
@@ -31,7 +34,10 @@ void setup()
     setupDeviceName();
     setupIrTx();
     setupIrRx();
+    setupFs();
+    setupActivities();
     setupWifi();
+    setupHttp();
     setupBle();
 
     ledColor(0, 4, 0); // green = ready
@@ -42,6 +48,8 @@ void loop()
     pollSerial();
     pollIrRx();
     pollWifi();
+    pollHttp();
+    pollActivities();
     pollTelnet();
     pollBle();
 }

@@ -1,0 +1,6 @@
+{
+    "type": "module",
+    "dependencies": {
+        "@toptensoftware/binpack": "github:toptensoftware/binpack"
+    }
+}

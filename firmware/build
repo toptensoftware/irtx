@@ -17,6 +17,7 @@ set -e
 DO_BUILD=false
 DO_FLASH=false
 DO_CLEAN=false
+DO_VERBOSE=false
 BOARD=
 PORT=
 
@@ -25,6 +26,7 @@ while [[ $# -gt 0 ]]; do
     --build) DO_BUILD=true ;;
     --flash) DO_FLASH=true ;;
     --clean) DO_CLEAN=true ;;
+    --verbose) DO_VERBOSE=true ;;
     c3|c6)   BOARD=$1 ;;
     *)       PORT=$1 ;;
   esac
@@ -44,7 +46,9 @@ esac
 if $DO_BUILD; then
   CLEAN_FLAG=""
   $DO_CLEAN && CLEAN_FLAG="--clean"
-  arduino-cli compile --fqbn $FQBN $CLEAN_FLAG .
+  VERBOSE_FLAG=""
+  $DO_VERBOSE && VERBOSE_FLAG="--verbose"
+  arduino-cli compile --fqbn $FQBN $CLEAN_FLAG $VERBOSE_FLAG .
 fi
 
 if $DO_FLASH; then
