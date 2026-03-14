@@ -26,6 +26,7 @@
 #include "config.h"
 #include "ir_decoder.h"
 #include "ir_router.h"
+#include "activities.h"
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 
 void onDecoded(const IrProtocol& protocol, uint64_t data) {
     VERBOSE("Decoded %s: 0x%016llX\n", protocol.name, data);
+    applyActivityBinding(protocol.id, data);
     applyRoutes(protocol.id, data);
 }
 
