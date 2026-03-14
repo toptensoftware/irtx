@@ -2,6 +2,8 @@
 
 #include "activities_types.h"
 
+#define MAX_ACTIVITIES_DEVICES 32
+
 extern activitiesRoot* activitiesConfig;
 
 // Lifecycle

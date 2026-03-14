@@ -1,13 +1,21 @@
-const cmdSendIr = 1;
-const cmdSendWol = 2;
-const cmdHttpGet = 3;
-const cmdHttpPost = 4;
-const cmdUdpPacket = 5;
-const cmdDelay = 6;
-const cmdLed = 7;
-const cmdSwitchActivity = 8;
+import { registerEnum } from "@toptensoftware/binpack";
 
-const bindingTypeIr = 1;
+const opId = {
+    send_ir:         1,
+    send_wol:        2,
+    http_get:        3,
+    http_post:       4,
+    udp_packet:      5,
+    delay:           6,
+    led:             7,
+    switch_activity: 8,
+};
+registerEnum("op", opId);
+
+const bindingType = {
+    ir: 1,
+};
+registerEnum("binding_type", bindingType);
 
 
 let types = [
@@ -58,14 +66,14 @@ let types = [
     resolveAbstractType: (val) => {
         switch (val.op)
         {
-            case cmdSendIr: return "sendIrOp";
-            case cmdSendWol: return "sendWolOp";
-            case cmdHttpGet: return "httpGetOp";
-            case cmdHttpPost: return "httpPostOp";
-            case cmdUdpPacket: return "udpPacketOp";
-            case cmdDelay: return "delayOp";
-            case cmdLed: return "ledOp";
-            case cmdSwitchActivity: return "switchActivityOp";
+            case opId.send_ir:         return "sendIrOp";
+            case opId.send_wol:        return "sendWolOp";
+            case opId.http_get:        return "httpGetOp";
+            case opId.http_post:       return "httpPostOp";
+            case opId.udp_packet:      return "udpPacketOp";
+            case opId.delay:           return "delayOp";
+            case opId.led:             return "ledOp";
+            case opId.switch_activity: return "switchActivityOp";
         }
     },
     fields: [
@@ -152,7 +160,7 @@ let types = [
     resolveAbstractType: (val) => {
         switch (val.type)
         {
-            case bindingTypeIr: return "bindingIr";
+            case bindingType.ir: return "bindingIr";
         }
     },
     fields: [

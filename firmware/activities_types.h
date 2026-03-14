@@ -6,21 +6,18 @@
 extern "C" {
 #endif
 
-// ---- Op type codes (match binpack.js) ----
-#define OP_SEND_IR         1
-#define OP_SEND_WOL        2
-#define OP_HTTP_GET        3
-#define OP_HTTP_POST       4
-#define OP_UDP_PACKET      5
-#define OP_DELAY           6
-#define OP_LED             7
+// op
+#define OP_SEND_IR 1
+#define OP_SEND_WOL 2
+#define OP_HTTP_GET 3
+#define OP_HTTP_POST 4
+#define OP_UDP_PACKET 5
+#define OP_DELAY 6
+#define OP_LED 7
 #define OP_SWITCH_ACTIVITY 8
 
-// ---- Binding type codes (match binpack.js) ----
-#define BINDING_TYPE_IR    1
-
-// ---- Device limits ----
-#define MAX_ACTIVITIES_DEVICES 32
+// binding_type
+#define BINDING_TYPE_IR 1
 
 // Forward declarations
 typedef struct activitiesRoot activitiesRoot;
