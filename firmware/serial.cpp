@@ -9,7 +9,6 @@
 #include "log.h"
 #include "esp_system.h"
 #include "ir_protocol.h"
-#include "ir_router.h"
 #include "activities.h"
 
 static char inputLine[INPUT_MAX];
@@ -130,7 +129,6 @@ void handleCommand(const char* line)
         statusProtocols();
         statusWifi();
         statusBle();
-        statusRoutes();
         statusActivities();
     }
     else if (strcmp(line, "dmesg") == 0)
