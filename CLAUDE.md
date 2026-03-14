@@ -113,6 +113,4 @@ After modifying `binpack.js`, regenerate `firmware/activities_types.h` with:
 npx toptensoftware/binpack --header:firmware/activities_types.h
 ```
 
-Run from the project root. After regenerating, manually restore the `#define`
-constants at the top of the header (`OP_*`, `BINDING_TYPE_*`,
-`MAX_ACTIVITIES_DEVICES`) — the generator emits structs only.
+Run from the project root.
