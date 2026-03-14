@@ -9,7 +9,7 @@
 #include "log.h"
 #include "esp_system.h"
 #include "ir_protocol.h"
-#include "ir_router.h"
+#include "activities.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -91,13 +91,45 @@ void handleCommand(const char* line)
         else
             LOG("Usage: led <r> <g> <b>\n");
     }
+    else if (strncmp(line, "activity ", 9) == 0)
+    {
+        const char* arg = line + 9;
+        while (*arg == ' ') arg++;
+        if (!activitiesConfig)
+        {
+            PRINT("No activities config loaded\n");
+            return;
+        }
+        // Accept either an index or a name.
+        int idx = -1;
+        // Try name match first.
+        for (uint32_t i = 0; i < activitiesConfig->activities_count; i++)
+        {
+            if (strcmp(activitiesConfig->activities[i].name, arg) == 0)
+            {
+                idx = (int)i;
+                break;
+            }
+        }
+        // Fall back to numeric index.
+        if (idx < 0)
+        {
+            char* end;
+            long n = strtol(arg, &end, 10);
+            if (end != arg) idx = (int)n;
+        }
+        if (idx < 0)
+            PRINT("Unknown activity: %s\n", arg);
+        else
+            switchActivity(idx);
+    }
     else if (strcmp(line, "status") == 0)
     {
         statusDeviceName();
         statusProtocols();
         statusWifi();
         statusBle();
-        statusRoutes();
+        statusActivities();
     }
     else if (strcmp(line, "dmesg") == 0)
     {
