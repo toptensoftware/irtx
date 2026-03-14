@@ -151,17 +151,17 @@ struct __attribute__((packed)) switchActivityOp
 struct __attribute__((packed)) binding
 {
 	/*    0 */	uint32_t type;
+	/*    4 */	uint32_t ops_count;
+	/*    8 */	op** ops;
 };
 
 // bindingIr
 struct __attribute__((packed)) bindingIr
 {
 	/*    0 */	binding base;
-	/*    4 */	uint32_t protocol;
-	/*    8 */	uint64_t modifier;
-	/*   16 */	uint64_t value;
-	/*   24 */	uint32_t ops_count;
-	/*   28 */	op** ops;
+	/*   12 */	uint32_t protocol;
+	/*   16 */	uint64_t modifier;
+	/*   24 */	uint64_t value;
 };
 
 #ifdef __cplusplus

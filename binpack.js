@@ -165,6 +165,8 @@ let types = [
     },
     fields: [
         { name: "type", type: "uint" },
+        { name: "ops", type: "length" },
+        { name: "ops", type: "op**" },       // Ops to execute
     ]
 },
 
@@ -175,8 +177,6 @@ let types = [
         { name: "protocol", type: "uint" },             // protocol name (riff)
         { name: "modifier", type: "ulong" },            // zero for non-modified
         { name: "value", type: "ulong" },               // ir code
-        { name: "ops", type: "length" },
-        { name: "ops", type: "op**" },       // Ops to execute
     ]
 },
 
