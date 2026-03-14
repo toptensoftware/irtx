@@ -8,6 +8,7 @@
 #include "ir_tx.h"
 #include "wifi_udp.h"
 #include "ble.h"
+#include "activities.h"
 
 WiFiUDP udp;
 static uint8_t packetBuffer[IR_HEADER_SIZE + MAX_TIMING_VALUES * 2];
@@ -61,6 +62,15 @@ void handleUdpPacket(uint8_t* data, int length)
         case 2: handleBleConnectPacket(data, length);     break;
         case 3: handleBleHidPacket(data, length);     break;
         case 4: handleIrCodePacket(data, length);      break;
+        case 5:
+        {
+            // [uint16 cmd=5][uint32 activityIndex]
+            if (length < 6) { LOG("UDP: activity packet too short\n"); break; }
+            uint32_t index;
+            memcpy(&index, data + 2, 4);
+            switchActivity((int)index);
+            break;
+        }
         default: LOG("UDP: unknown command %d\n", cmd);
     }
 }
