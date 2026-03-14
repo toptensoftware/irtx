@@ -148,8 +148,7 @@ void handleCommand(const char* line)
     }
     else
     {
-        LOG("Unknown command: %s\n", line);
-        LOG("Commands: setwifi <ssid> <password> | name <devicename> | pair <0-3> | unpair <0-3> | status | dmesg\n");
+        PRINT("Unknown command: %s\n", line);
     }
 }
 

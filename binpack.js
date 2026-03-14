@@ -25,10 +25,10 @@ let types = [
     name: "device",
     fields: [
         { name: "name", type: "string" },
-        { name: "onCommands", type: "length" },
-        { name: "onCommands", type: "command**" },
-        { name: "offCommands", type: "length" },
-        { name: "offCommands", type: "command**" },
+        { name: "onOps", type: "length" },
+        { name: "onOps", type: "op**" },
+        { name: "offOps", type: "length" },
+        { name: "offOps", type: "op**" },
     ]
 },
 
@@ -36,34 +36,34 @@ let types = [
     name: "activity",
     fields: [
         { name: "name", type: "string" },
-        { name: "deviceStates", type: "length" },
-        { name: "deviceStates", type: "deviceState*" },
+        { name: "devices", type: "length" },
+        { name: "devices", type: "int*" },
         { name: "bindings", type: "length" },
         { name: "bindings", type: "binding*", default: [] },
-        { name: "willActivateCommands", type: "length" },
-        { name: "willActivateCommands", type: "command**", default: [] },
-        { name: "didActivateCommands", type: "length" },
-        { name: "didActivateCommands", type: "command**", default: [] },
-        { name: "willDeactivateCommands", type: "length" },
-        { name: "willDeactivateCommands", type: "command**", default: [] },
-        { name: "didDectivateCommands", type: "length" },
-        { name: "didDectivateCommands", type: "command**", default: [] },
+        { name: "willActivateOps", type: "length" },
+        { name: "willActivateOps", type: "op**", default: [] },
+        { name: "didActivateOps", type: "length" },
+        { name: "didActivateOps", type: "op**", default: [] },
+        { name: "willDeactivateOps", type: "length" },
+        { name: "willDeactivateOps", type: "op**", default: [] },
+        { name: "didDectivateOps", type: "length" },
+        { name: "didDectivateOps", type: "op**", default: [] },
     ]
 },
 
 {
-    name: "command",
+    name: "op",
     resolveAbstractType: (val) => {
         switch (val.op)
         {
-            case cmdSendIr: return "sendIrCommand";
-            case cmdSendWol: return "sendWolCommand";
-            case cmdHttpGet: return "httpGetCommand";
-            case cmdHttpPost: return "httpPostCommand";
-            case cmdUdpPacket: return "udpPacketCommand";
-            case cmdDelay: return "delayCommand";
-            case cmdLed: return "ledCommand";
-            case cmdSwitchActivity: return "switchActivityCommand";
+            case cmdSendIr: return "sendIrOp";
+            case cmdSendWol: return "sendWolOp";
+            case cmdHttpGet: return "httpGetOp";
+            case cmdHttpPost: return "httpPostOp";
+            case cmdUdpPacket: return "udpPacketOp";
+            case cmdDelay: return "delayOp";
+            case cmdLed: return "ledOp";
+            case cmdSwitchActivity: return "switchActivityOp";
         }
     },
     fields: [
@@ -72,8 +72,8 @@ let types = [
 },
 
 {
-    name: "sendIrCommand",
-    baseType: "command",
+    name: "sendIrOp",
+    baseType: "op",
     fields: [
         { name: "protocol", type: "uint" },
         { name: "irCode", type: "ulong" },
@@ -82,34 +82,36 @@ let types = [
 },
 
 {
-    name: "sendWolCommand",
-    baseType: "command",
+    name: "sendWolOp",
+    baseType: "op",
     fields: [
         { name: "macaddr", type: "byte[6]" },
     ]
 },
 
 {
-    name: "httpGetCommand",
-    baseType: "command",
+    name: "httpGetOp",
+    baseType: "op",
     fields: [
         { name: "url", type: "string" }
     ]
 },
 
 {
-    name: "httpPostCommand",
-    baseType: "command",
+    name: "httpPostOp",
+    baseType: "op",
     fields: [
         { name: "url", type: "string" },
-        { name: "data", type: "string" },
+        { name: "data", type: "length" },
+        { name: "data", type: "byte*" },
         { name: "contentType", type: "string" },
+        { name: "contentEncoding", type: "string" },
     ]
 },
 
 {
-    name: "udpPacketCommand",
-    baseType: "command",
+    name: "udpPacketOp",
+    baseType: "op",
     fields: [
         { name: "ipAddr", type: "uint" },
         { name: "data", type: "length" },
@@ -118,16 +120,16 @@ let types = [
 },
 
 {
-    name: "delayCommand",
-    baseType: "command",
+    name: "delayOp",
+    baseType: "op",
     fields: [
         { name: "duration", type: "uint" },
     ]
 },
 
 {
-    name: "ledCommand",
-    baseType: "command",
+    name: "ledOp",
+    baseType: "op",
     fields: [
         { name: "color", type: "uint" },
         { name: "period", type: "uint" },
@@ -136,8 +138,8 @@ let types = [
 },
 
 {
-    name: "switchActivityCommand",
-    baseType: "command",
+    name: "switchActivityOp",
+    baseType: "op",
     fields: [
         { name: "index", type: "uint" },
     ]
@@ -149,28 +151,10 @@ let types = [
         { name: "protocol", type: "uint" },             // protocol name (riff)
         { name: "modifier", type: "ulong" },            // zero for non-modified
         { name: "value", type: "ulong" },               // ir code
-        { name: "commands", type: "length" },
-        { name: "commands", type: "command**" },       // commands to execute
+        { name: "ops", type: "length" },
+        { name: "ops", type: "op**" },       // Ops to execute
     ]
 },
-
-{
-    name: "deviceState",
-    packMapper: (val, config) => {
-        if (val.name !== undefined)
-        {
-            return {
-                index: config.devices.findIndex(d => d.name === val.name),
-                on: val.on,
-            }
-        }
-        return val;
-    },
-    fields: [
-        { name: "index", type: "int" },
-        { name: "on", type: "bool" },
-    ]
-}
 
 ];
 

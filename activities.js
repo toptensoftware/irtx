@@ -3,32 +3,29 @@ const activitiesRoot = {
     devices: [
         { 
             name: "tv", 
-            onCommands: [], 
-            offCommands: [] 
+            onOps: [], 
+            offOps: [] 
         },
         { 
             name: "receiver", 
-            onCommands: [], 
-            offCommands: [] 
+            onOps: [], 
+            offOps: [] 
         },
         { 
             name: "dvr", 
-            onCommands: [], 
-            offCommands: [] 
+            onOps: [], 
+            offOps: [] 
         },
         { 
             name: "atv", 
-            onCommands: [], 
-            offCommands: [] 
+            onOps: [], 
+            offOps: [] 
         },
     ],
     activities: [
         {
             name: "off",
-            deviceStates: [
-                { name: "atv", on: false },
-                { name: "dvr", on: false },
-            ],
+            devices: [ ]
         }
     ],
 };
