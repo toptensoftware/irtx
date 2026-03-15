@@ -15,9 +15,13 @@ extern "C" {
 #define OP_DELAY 6
 #define OP_LED 7
 #define OP_SWITCH_ACTIVITY 8
+#define OP_SET_IR_REG 9
+#define OP_SEARCH_STRING 10
+#define OP_IF_TRUE 11
 
 // binding_type
 #define BINDING_TYPE_IR 1
+#define BINDING_TYPE_IR_ANY 2
 
 // binding_flags
 #define BINDING_FLAGS_CONTINUE_ROUTING 1
@@ -35,8 +39,12 @@ typedef struct udpPacketOp udpPacketOp;
 typedef struct delayOp delayOp;
 typedef struct ledOp ledOp;
 typedef struct switchActivityOp switchActivityOp;
+typedef struct setIrRegOp setIrRegOp;
+typedef struct searchStringOp searchStringOp;
+typedef struct ifTrueOp ifTrueOp;
 typedef struct binding binding;
 typedef struct bindingIr bindingIr;
+typedef struct bindingIrAny bindingIrAny;
 
 
 // activitiesRoot
@@ -150,6 +158,31 @@ struct __attribute__((packed)) switchActivityOp
 	/*    4 */	uint32_t index;
 };
 
+// setIrRegOp
+struct __attribute__((packed)) setIrRegOp
+{
+	/*    0 */	op base;
+	/*    4 */	uint32_t protocol;
+	/*    8 */	uint64_t irCode;
+};
+
+// searchStringOp
+struct __attribute__((packed)) searchStringOp
+{
+	/*    0 */	op base;
+	/*    4 */	const char* matchString;
+};
+
+// ifTrueOp
+struct __attribute__((packed)) ifTrueOp
+{
+	/*    0 */	op base;
+	/*    4 */	uint32_t trueOps_count;
+	/*    8 */	op** trueOps;
+	/*   12 */	uint32_t falseOps_count;
+	/*   16 */	op** falseOps;
+};
+
 // binding
 struct __attribute__((packed)) binding
 {
@@ -166,6 +199,12 @@ struct __attribute__((packed)) bindingIr
 	/*   16 */	uint32_t protocol;
 	/*   20 */	uint64_t modifier;
 	/*   28 */	uint64_t value;
+};
+
+// bindingIrAny
+struct __attribute__((packed)) bindingIrAny
+{
+	/*    0 */	binding base;
 };
 
 #ifdef __cplusplus

@@ -37,6 +37,17 @@ static unsigned long s_modifierExpiry   = 0;
 struct CommitOp { op base; uint32_t newIndex; };
 static CommitOp s_commitOp;
 
+// ---- Heap-allocated op flag ----
+// OR'd into op::op for ops allocated at runtime (not from the binary blob).
+// Such ops are freed by the queue drainer after execution.
+#define OP_FLAG_HEAP 0x80000000u
+#define OP_CODE(o)   ((o)->op & ~OP_FLAG_HEAP)
+
+// ---- Registers ----
+static struct { uint32_t protocol; uint64_t irCode; } s_irReg = {0, 0};
+static String  s_stringReg;
+static bool    s_boolReg = false;
+
 // ---- Op ring buffer ----
 #define OP_QUEUE_SIZE 32
 static op* s_opQueue[OP_QUEUE_SIZE];
@@ -63,6 +74,25 @@ void enqueueOps(op** ops, uint32_t count)
         if (ops[i]) enqueueOp(ops[i]);
 }
 
+// Insert ops at the HEAD of the queue so they execute before already-queued ops.
+// Used by ifTrueOp to inject the chosen branch ahead of any remaining ops.
+// Iterates in reverse so that ops end up in forward order after insertion.
+static void injectOpsAtHead(op** ops, uint32_t count)
+{
+    for (int i = (int)count - 1; i >= 0; i--)
+    {
+        if (!ops[i]) continue;
+        int newHead = (s_opHead - 1 + OP_QUEUE_SIZE) % OP_QUEUE_SIZE;
+        if (newHead == s_opTail)
+        {
+            LOG("Activities: if-branch overflow, dropping remaining ops\n");
+            break;
+        }
+        s_opHead = newHead;
+        s_opQueue[s_opHead] = ops[i];
+    }
+}
+
 // ---- Async op execution state ----
 static op*           s_currentOp      = nullptr;
 static unsigned long s_opEndMs        = 0;
@@ -75,14 +105,17 @@ static bool          s_ledOn          = true;
 // Timed ops set s_currentOp so pollCurrentOp() is called each cycle.
 static void startOp(op* o)
 {
-    switch (o->op)
+    switch (OP_CODE(o))
     {
         case OP_SEND_IR:
         {
             sendIrOp* sio = (sendIrOp*)o;
+            // protocol == 0 means use the IR code register (pass-through).
+            uint32_t proto = sio->protocol ? sio->protocol : s_irReg.protocol;
+            uint64_t code  = sio->protocol ? sio->irCode   : s_irReg.irCode;
             if (sio->ipAddr == 0)
             {
-                handleIrCode(0, sio->protocol, sio->irCode, false);
+                handleIrCode(0, proto, code, false);
             }
             else
             {
@@ -91,11 +124,11 @@ static void startOp(op* o)
                 uint16_t cmd    = 4;
                 uint16_t devIdx = 0;
                 uint8_t  repeat = 0;
-                memcpy(pkt,      &cmd,           2);
-                memcpy(pkt + 2,  &devIdx,        2);
-                memcpy(pkt + 4,  &sio->protocol, 4);
-                memcpy(pkt + 8,  &sio->irCode,   8);
-                memcpy(pkt + 16, &repeat,        1);
+                memcpy(pkt,      &cmd,    2);
+                memcpy(pkt + 2,  &devIdx, 2);
+                memcpy(pkt + 4,  &proto,  4);
+                memcpy(pkt + 8,  &code,   8);
+                memcpy(pkt + 16, &repeat, 1);
                 IPAddress ip(sio->ipAddr & 0xFF,
                             (sio->ipAddr >> 8)  & 0xFF,
                             (sio->ipAddr >> 16) & 0xFF,
@@ -104,7 +137,7 @@ static void startOp(op* o)
                 udp.write(pkt, sizeof(pkt));
                 udp.endPacket();
                 VERBOSE("Activities: IR -> %s 0x%08X:0x%016llX\n",
-                        ip.toString().c_str(), sio->protocol, sio->irCode);
+                        ip.toString().c_str(), proto, code);
             }
             break;
         }
@@ -128,12 +161,14 @@ static void startOp(op* o)
         case OP_HTTP_GET:
         {
             // NOTE: HTTPClient.GET() blocks until the response is received.
+            // Response body is stored in s_stringReg for use by searchStringOp.
             httpGetOp* hg = (httpGetOp*)o;
             if (WiFi.status() == WL_CONNECTED)
             {
                 HTTPClient http;
                 http.begin(hg->url);
                 int code = http.GET();
+                s_stringReg = (code > 0) ? http.getString() : "";
                 LOG("Activities: HTTP GET %s -> %d\n", hg->url, code);
                 http.end();
             }
@@ -214,6 +249,33 @@ static void startOp(op* o)
             break;
         }
 
+        case OP_SET_IR_REG:
+        {
+            setIrRegOp* sr = (setIrRegOp*)o;
+            s_irReg.protocol = sr->protocol;
+            s_irReg.irCode   = sr->irCode;
+            break;
+        }
+
+        case OP_SEARCH_STRING:
+        {
+            searchStringOp* ss = (searchStringOp*)o;
+            s_boolReg = s_stringReg.indexOf(ss->matchString) >= 0;
+            LOG("Activities: search '%s' -> %s\n",
+                ss->matchString, s_boolReg ? "true" : "false");
+            break;
+        }
+
+        case OP_IF_TRUE:
+        {
+            ifTrueOp* it = (ifTrueOp*)o;
+            if (s_boolReg)
+                injectOpsAtHead(it->trueOps,  it->trueOps_count);
+            else
+                injectOpsAtHead(it->falseOps, it->falseOps_count);
+            break;
+        }
+
         case OP_INTERNAL_COMMIT:
         {
             CommitOp* co = (CommitOp*)o;
@@ -224,7 +286,7 @@ static void startOp(op* o)
         }
 
         default:
-            LOG("Activities: unknown op %d\n", (int)o->op);
+            LOG("Activities: unknown op %d\n", (int)OP_CODE(o));
             break;
     }
 }
@@ -236,7 +298,7 @@ static bool pollCurrentOp()
 
     unsigned long now = millis();
 
-    switch (s_currentOp->op)
+    switch (OP_CODE(s_currentOp))
     {
         case OP_DELAY:
             return now >= s_opEndMs;
@@ -366,6 +428,31 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
     activity*     act = &activitiesConfig->activities[s_currentActivity];
     unsigned long now = millis();
 
+    // Prepend a setIrRegOp before the first binding's ops so the IR register
+    // reflects the received code throughout the sequence. Allocated once per
+    // call; if allocation fails the sequence still runs with a stale register.
+    bool irRegSet = false;
+    auto enqueueBindingOps = [&](binding* b)
+    {
+        if (!irRegSet)
+        {
+            setIrRegOp* sr = (setIrRegOp*)malloc(sizeof(setIrRegOp));
+            if (sr)
+            {
+                sr->base.op  = OP_SET_IR_REG | OP_FLAG_HEAP;
+                sr->protocol = protocol;
+                sr->irCode   = value;
+                enqueueOp((op*)sr);
+                irRegSet = true;
+            }
+            else
+            {
+                LOG("Activities: failed to alloc setIrRegOp\n");
+            }
+        }
+        enqueueOps(b->ops, b->ops_count);
+    };
+
     // 1. If a modifier is pending, look for a modifier+key binding first.
     bool modifierConsumed = false;
     if (s_modifierProtocol != 0 && now < s_modifierExpiry)
@@ -381,7 +468,7 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
             {
                 VERBOSE("Activities: modifier+key binding matched\n");
                 modifierConsumed = true;
-                enqueueOps(b->ops, b->ops_count);
+                enqueueBindingOps(b);
                 if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
                 {
                     s_modifierProtocol = 0;
@@ -402,13 +489,14 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
         if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value)
         {
             VERBOSE("Activities: binding matched\n");
-            enqueueOps(b->ops, b->ops_count);
+            enqueueBindingOps(b);
             if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
                 return;
         }
     }
 
-    // 3. Check if this key acts as a modifier for any binding in this activity.
+    // 3. Check if this code arms a modifier for any binding in this activity.
+    //    Modifier codes do not set the IR register or trigger wildcard bindings.
     for (uint32_t i = 0; i < act->bindings_count; i++)
     {
         binding* b = act->bindings[i];
@@ -423,6 +511,17 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
             s_modifierExpiry   = now + MODIFIER_TIMEOUT_MS;
             return;
         }
+    }
+
+    // 4. Wildcard bindings — match any IR code not claimed above.
+    for (uint32_t i = 0; i < act->bindings_count; i++)
+    {
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_IR_ANY) continue;
+        VERBOSE("Activities: wildcard binding matched\n");
+        enqueueBindingOps(b);
+        if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
+            return;
     }
 }
 
@@ -546,12 +645,25 @@ void setupActivities()
 
 bool reloadActivities()
 {
+    // Free any heap-allocated ops still in the queue before discarding it.
+    while (!isQueueEmpty())
+    {
+        op* o = s_opQueue[s_opHead];
+        s_opHead = (s_opHead + 1) % OP_QUEUE_SIZE;
+        if (o->op & OP_FLAG_HEAP) free(o);
+    }
+    if (s_currentOp && (s_currentOp->op & OP_FLAG_HEAP))
+        free(s_currentOp);
+
     // Reset all runtime state before reloading.
     s_opHead = s_opTail = 0;
     s_currentOp        = nullptr;
     s_deviceOnMask     = 0;
     s_currentActivity  = 0;
     s_modifierProtocol = 0;
+    s_stringReg        = "";
+    s_boolReg          = false;
+    s_irReg            = {0, 0};
 
     free(activitiesData);
     activitiesData   = nullptr;
@@ -578,7 +690,10 @@ void pollActivities()
     if (s_currentOp != nullptr)
     {
         if (pollCurrentOp())
+        {
+            if (s_currentOp->op & OP_FLAG_HEAP) free(s_currentOp);
             s_currentOp = nullptr;
+        }
         return;  // at most one op per cycle
     }
 
@@ -588,5 +703,9 @@ void pollActivities()
         op* next = s_opQueue[s_opHead];
         s_opHead = (s_opHead + 1) % OP_QUEUE_SIZE;
         startOp(next);
+        // Free heap-allocated ops once they have finished executing.
+        // Timed ops (delay, LED) set s_currentOp and are freed on completion above.
+        if (s_currentOp == nullptr && (next->op & OP_FLAG_HEAP))
+            free(next);
     }
 }
