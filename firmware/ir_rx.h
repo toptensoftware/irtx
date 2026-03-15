@@ -15,3 +15,4 @@ void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind);
 void setupIrRx();
 void pollIrRx();
 void suppressRelease();
+void simulateIrRx(uint32_t protocol, uint64_t code, uint32_t eventKindMask);

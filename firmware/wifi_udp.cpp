@@ -9,6 +9,7 @@
 #include "wifi_udp.h"
 #include "ble.h"
 #include "activities.h"
+#include "ir_rx.h"
 
 WiFiUDP udp;
 static uint8_t packetBuffer[IR_HEADER_SIZE + MAX_TIMING_VALUES * 2];
@@ -69,6 +70,19 @@ void handleUdpPacket(uint8_t* data, int length)
             uint32_t index;
             memcpy(&index, data + 2, 4);
             switchActivity((int)index);
+            break;
+        }
+        case 6:
+        {
+            // [uint16 cmd=6][uint32 protocol][uint64 code][uint32 eventKindMask]
+            if (length < 18) { LOG("UDP: simulate IR packet too short\n"); break; }
+            uint32_t protocol;
+            uint64_t code;
+            uint32_t eventKindMask;
+            memcpy(&protocol,     data + 2,  4);
+            memcpy(&code,         data + 6,  8);
+            memcpy(&eventKindMask, data + 14, 4);
+            simulateIrRx(protocol, code, eventKindMask);
             break;
         }
         default: LOG("UDP: unknown command %d\n", cmd);
