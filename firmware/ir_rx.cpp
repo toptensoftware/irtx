@@ -59,44 +59,21 @@ static struct {
 
 // ── IR event stub ─────────────────────────────────────────────────────────────
 
+const char* nameOfEventKind(IrEventKind kind)
+{
+    switch (kind)
+    {
+        case IrEventKind::Press: return "press";
+        case IrEventKind::Repeat: return "repeat";
+        case IrEventKind::LongPress: return "long-press";
+        case IrEventKind::Release: return "release";
+    }
+}
+
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
 {
+    VERBOSE("IR Event %s 0x%08X/%016llX\n", nameOfEventKind(kind), protocol_id, code);
     applyActivityBinding(protocol_id, code, kind);
-}
-
-void suppressRelease()
-{
-    ir_state.suppress_release = true;
-}
-
-void simulateIrRx(uint32_t protocol, uint64_t code, uint32_t eventKindMask)
-{
-    if (eventKindMask == 0)
-    {
-        // Call edge-detection logic (event synthesis via onDecoded)
-        const IrProtocol* p = getIrProtocolById(protocol);
-        if (!p)
-        {
-            LOG("simulateIrRx: unknown protocol 0x%08X\n", protocol);
-            return;
-        }
-        onDecoded(*p, code);
-    }
-    else
-    {
-        // Call activity dispatch logic directly for each requested event kind
-        static const IrEventKind kinds[] = {
-            IrEventKind::Press,
-            IrEventKind::Repeat,
-            IrEventKind::LongPress,
-            IrEventKind::Release,
-        };
-        for (auto kind : kinds)
-        {
-            if (eventKindMask & (uint32_t)kind)
-                onIrEvent(protocol, code, kind);
-        }
-    }
 }
 
 // ── ISR callback ──────────────────────────────────────────────────────────────
@@ -118,9 +95,9 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-void onDecoded(const IrProtocol& protocol, uint64_t data)
+void onDecoded(uint32_t protocol, uint64_t data)
 {
-    VERBOSE("Decoded %s: 0x%016llX\n", protocol.name, data);
+    VERBOSE("IR Decoded 0x%08X/%016llX\n", protocol, data);
 
     int64_t now = esp_timer_get_time();
 
@@ -128,14 +105,14 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
     // If there's no matching active press, ignore the repeat packet entirely.
     uint64_t code = data;
     if (data == IR_REPEAT_CODE) {
-        if (!ir_state.active || ir_state.protocol_id != protocol.id)
+        if (!ir_state.active || ir_state.protocol_id != protocol)
             return;
         code = ir_state.code;
     }
 
     // Is this the same key as the one currently held, within the repeat window?
     bool same_code     = ir_state.active &&
-                         ir_state.protocol_id == protocol.id &&
+                         ir_state.protocol_id == protocol &&
                          ir_state.code == code;
     bool within_window = same_code &&
                          (now - ir_state.last_received_us) < PRESS_TIMEOUT_US;
@@ -143,13 +120,13 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
     if (within_window) {
         // ── Repeat ────────────────────────────────────────────────────────────
         ir_state.last_received_us = now;
-        onIrEvent(protocol.id, ir_state.code, IrEventKind::Repeat);
+        onIrEvent(protocol, ir_state.code, IrEventKind::Repeat);
 
         // Long press fires once, after 500 ms of continuous holding
         if (!ir_state.long_press_fired &&
             (now - ir_state.press_us) >= LONG_PRESS_US) {
             ir_state.long_press_fired = true;
-            onIrEvent(protocol.id, ir_state.code, IrEventKind::LongPress);
+            onIrEvent(protocol, ir_state.code, IrEventKind::LongPress);
         }
     } else {
         // ── Release old key (if any), then press the new one ──────────────────
@@ -160,7 +137,7 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
             ir_state.suppress_release  = false;
         }
 
-        ir_state.protocol_id       = protocol.id;
+        ir_state.protocol_id       = protocol;
         ir_state.code              = code;
         ir_state.press_us          = now;
         ir_state.last_received_us  = now;
@@ -168,10 +145,14 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
         ir_state.suppress_release  = false;
         ir_state.active            = true;
 
-        onIrEvent(protocol.id, code, IrEventKind::Press);
+        onIrEvent(protocol, code, IrEventKind::Press);
     }
 }
 
+void onDecoded(const IrProtocol& protocol, uint64_t data)
+{
+    onDecoded(protocol.id, data);
+}
 
 static void decode_pulse(bool pulse, uint64_t us)
 {
@@ -281,3 +262,22 @@ void pollIrRx()
     last_end_us = esp_timer_get_time();
     start_receive();
 }
+
+
+void suppressRelease()
+{
+    ir_state.suppress_release = true;
+}
+
+void simulateIrRx(uint32_t protocol, uint64_t code, uint32_t eventKindMask)
+{
+    if (eventKindMask == 0)
+    {
+        onDecoded(protocol, code);
+    }
+    else
+    {
+        onIrEvent(protocol, code, (IrEventKind)eventKindMask);
+    }
+}
+

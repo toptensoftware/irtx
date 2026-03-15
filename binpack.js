@@ -1,6 +1,4 @@
-import { registerEnum } from "@toptensoftware/binpack";
-
-const opId = {
+export const opId = {
     send_ir:         1,
     send_wol:        2,
     http_get:        3,
@@ -13,29 +11,30 @@ const opId = {
     search_string:   10,
     if_true:         11,
 };
-registerEnum("op", opId);
 
-const bindingType = {
+export const bindingType = {
     ir:     1,
     ir_any: 2,
 };
-registerEnum("binding_type", bindingType);
 
-const bindingFlags = {
+export const bindingFlags = {
     continue_routing: 1,
 };
-registerEnum("binding_flags", bindingFlags);
 
-const irEventKindMask = {
+export const irEventKindMask = {
     press:      1,
     repeat:     2,
     long_press: 4,
     release:    8,
 };
-registerEnum("ir_event_kind_mask", irEventKindMask);
 
 
 let types = [
+
+{ name: "op", enum: opId },
+{ name: "binding_type", enum: bindingType },
+{ name: "binding_flags", enum: bindingFlags },
+{ name: "ir_event_kind_mask", enum: irEventKindMask },
 
 {
     name: "activitiesRoot",
@@ -80,7 +79,7 @@ let types = [
 
 {
     name: "op",
-    resolveAbstractType: (val) => {
+    resolveVirtualType: (val) => {
         switch (val.op)
         {
             case opId.send_ir:         return "sendIrOp";
@@ -107,7 +106,7 @@ let types = [
     fields: [
         { name: "protocol", type: "uint" },
         { name: "irCode", type: "ulong" },
-        { name: "ipAddr", type: "uint" },
+        { name: "ipAddr", type: "uint", default: 0 },
     ]
 },
 
@@ -205,7 +204,7 @@ let types = [
 
 {
     name: "binding",
-    resolveAbstractType: (val) => {
+    resolveVirtualType: (val) => {
         switch (val.type)
         {
             case bindingType.ir:     return "bindingIr";
@@ -225,7 +224,7 @@ let types = [
     baseType: "binding",
     fields: [
         { name: "protocol",  type: "uint" },                                    // protocol name (riff)
-        { name: "eventMask", type: "uint", default: 0xF },                      // bitmask of IrEventKind values to match (0xF = all)
+        { name: "eventMask", type: "uint", default: 0x1 },                      // bitmask of IrEventKind values to match (0xF = all)
         { name: "modifier",  type: "ulong" },                                   // zero for non-modified
         { name: "value",     type: "ulong" },                                   // ir code
     ]

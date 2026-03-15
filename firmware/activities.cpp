@@ -548,31 +548,37 @@ void applyActivityBinding(uint32_t protocol, uint64_t value, IrEventKind kind)
 
     // 3. Check if this code arms a modifier for any binding in this activity.
     //    Modifier codes do not set the IR register or trigger wildcard bindings.
-    for (uint32_t i = 0; i < act->bindings_count; i++)
+    if (kind == IrEventKind::Press)
     {
-        binding* b = act->bindings[i];
-        if (b->type != BINDING_TYPE_IR) continue;
-        bindingIr* bir = (bindingIr*)b;
-        if (bir->modifier != 0 && bir->protocol == protocol && bir->modifier == value)
+        for (uint32_t i = 0; i < act->bindings_count; i++)
         {
-            VERBOSE("Activities: modifier key armed 0x%016llX (timeout %ds)\n",
-                    value, MODIFIER_TIMEOUT_MS / 1000);
-            s_modifierProtocol = protocol;
-            s_modifierValue    = value;
-            s_modifierExpiry   = now + MODIFIER_TIMEOUT_MS;
-            return;
+            binding* b = act->bindings[i];
+            if (b->type != BINDING_TYPE_IR) continue;
+            bindingIr* bir = (bindingIr*)b;
+            if (bir->modifier != 0 && bir->protocol == protocol && bir->modifier == value)
+            {
+                VERBOSE("Activities: modifier key armed 0x%016llX (timeout %ds)\n",
+                        value, MODIFIER_TIMEOUT_MS / 1000);
+                s_modifierProtocol = protocol;
+                s_modifierValue    = value;
+                s_modifierExpiry   = now + MODIFIER_TIMEOUT_MS;
+                return;
+            }
         }
     }
 
     // 4. Wildcard bindings — match any IR code not claimed above.
-    for (uint32_t i = 0; i < act->bindings_count; i++)
+    if (kind == IrEventKind::Press || kind == IrEventKind::Repeat)
     {
-        binding* b = act->bindings[i];
-        if (b->type != BINDING_TYPE_IR_ANY) continue;
-        VERBOSE("Activities: wildcard binding matched\n");
-        enqueueBindingOps(b);
-        if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
-            return;
+        for (uint32_t i = 0; i < act->bindings_count; i++)
+        {
+            binding* b = act->bindings[i];
+            if (b->type != BINDING_TYPE_IR_ANY) continue;
+            VERBOSE("Activities: wildcard binding matched\n");
+            enqueueBindingOps(b);
+            if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
+                return;
+        }
     }
 }
 
