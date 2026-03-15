@@ -9,11 +9,15 @@ const opId = {
     delay:           6,
     led:             7,
     switch_activity: 8,
+    set_ir_reg:      9,
+    search_string:   10,
+    if_true:         11,
 };
 registerEnum("op", opId);
 
 const bindingType = {
-    ir: 1,
+    ir:     1,
+    ir_any: 2,
 };
 registerEnum("binding_type", bindingType);
 
@@ -79,6 +83,9 @@ let types = [
             case opId.delay:           return "delayOp";
             case opId.led:             return "ledOp";
             case opId.switch_activity: return "switchActivityOp";
+            case opId.set_ir_reg:      return "setIrRegOp";
+            case opId.search_string:   return "searchStringOp";
+            case opId.if_true:         return "ifTrueOp";
         }
     },
     fields: [
@@ -161,11 +168,40 @@ let types = [
 },
 
 {
+    name: "setIrRegOp",
+    baseType: "op",
+    fields: [
+        { name: "protocol", type: "uint" },
+        { name: "irCode",   type: "ulong" },
+    ]
+},
+
+{
+    name: "searchStringOp",
+    baseType: "op",
+    fields: [
+        { name: "matchString", type: "string" },
+    ]
+},
+
+{
+    name: "ifTrueOp",
+    baseType: "op",
+    fields: [
+        { name: "trueOps",  type: "length" },
+        { name: "trueOps",  type: "op**" },
+        { name: "falseOps", type: "length" },
+        { name: "falseOps", type: "op**" },
+    ]
+},
+
+{
     name: "binding",
     resolveAbstractType: (val) => {
         switch (val.type)
         {
-            case bindingType.ir: return "bindingIr";
+            case bindingType.ir:     return "bindingIr";
+            case bindingType.ir_any: return "bindingIrAny";
         }
     },
     fields: [
@@ -184,6 +220,12 @@ let types = [
         { name: "modifier", type: "ulong" },            // zero for non-modified
         { name: "value", type: "ulong" },               // ir code
     ]
+},
+
+{
+    name: "bindingIrAny",
+    baseType: "binding",
+    fields: []                                          // matches any received IR code
 },
 
 ];
