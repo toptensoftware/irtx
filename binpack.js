@@ -26,6 +26,14 @@ const bindingFlags = {
 };
 registerEnum("binding_flags", bindingFlags);
 
+const irEventKindMask = {
+    press:      1,
+    repeat:     2,
+    long_press: 4,
+    release:    8,
+};
+registerEnum("ir_event_kind_mask", irEventKindMask);
+
 
 let types = [
 
@@ -216,9 +224,10 @@ let types = [
     name: "bindingIr",
     baseType: "binding",
     fields: [
-        { name: "protocol", type: "uint" },             // protocol name (riff)
-        { name: "modifier", type: "ulong" },            // zero for non-modified
-        { name: "value", type: "ulong" },               // ir code
+        { name: "protocol",  type: "uint" },                                    // protocol name (riff)
+        { name: "eventMask", type: "uint", default: 0xF },                      // bitmask of IrEventKind values to match (0xF = all)
+        { name: "modifier",  type: "ulong" },                                   // zero for non-modified
+        { name: "value",     type: "ulong" },                                   // ir code
     ]
 },
 

@@ -5,6 +5,7 @@
 #include "config.h"
 #include "activities_types.h"
 #include "activities.h"
+#include "ir_rx.h"
 #include "ir_tx.h"
 #include "wifi_udp.h"
 #include "led.h"
@@ -463,7 +464,7 @@ void switchActivity(int newIndex)
 }
 
 // ---- Binding matcher (called from IR RX on every decoded code) ----
-void applyActivityBinding(uint32_t protocol, uint64_t value)
+void applyActivityBinding(uint32_t protocol, uint64_t value, IrEventKind kind)
 {
     if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
 
@@ -495,6 +496,8 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
         enqueueOps(b->ops, b->ops_count);
     };
 
+    uint32_t kindMask = (uint32_t)kind;
+
     // 1. If a modifier is pending, look for a modifier+key binding first.
     bool modifierConsumed = false;
     if (s_modifierProtocol != 0 && now < s_modifierExpiry)
@@ -506,10 +509,13 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
             bindingIr* bir = (bindingIr*)b;
             if (bir->protocol == protocol &&
                 bir->modifier  == s_modifierValue &&
-                bir->value     == value)
+                bir->value     == value &&
+                (bir->eventMask & kindMask))
             {
                 VERBOSE("Activities: modifier+key binding matched\n");
                 modifierConsumed = true;
+                if (kind == IrEventKind::LongPress)
+                    suppressRelease();
                 enqueueBindingOps(b);
                 if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
                 {
@@ -528,9 +534,12 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
         binding* b = act->bindings[i];
         if (b->type != BINDING_TYPE_IR) continue;
         bindingIr* bir = (bindingIr*)b;
-        if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value)
+        if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value &&
+            (bir->eventMask & kindMask))
         {
             VERBOSE("Activities: binding matched\n");
+            if (kind == IrEventKind::LongPress)
+                suppressRelease();
             enqueueBindingOps(b);
             if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
                 return;
