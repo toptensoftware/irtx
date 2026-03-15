@@ -26,6 +26,7 @@
 #include "config.h"
 #include "ir_decoder.h"
 #include "activities.h"
+#include "ir_rx.h"
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -34,11 +35,33 @@
 #define BUF_SYMBOLS         96          // 2 × 48-word hw blocks (both RX channels' memory)
 #define LONG_BREAK_US       5000000ULL  // threshold for "long break" label (5 s)
 
+#define IR_REPEAT_CODE      0xFFFFFFFFFFFFFFFFULL
+#define PRESS_TIMEOUT_US    200000LL    // 200 ms — same code within this window is a repeat
+#define LONG_PRESS_US       500000LL    // 500 ms since press → synthesize long-press
+
 // ── Globals ───────────────────────────────────────────────────────────────────
 
 static rmt_channel_handle_t rx_chan  = NULL;
 static rmt_symbol_word_t    rx_buf[BUF_SYMBOLS];
 static QueueHandle_t        rx_queue;
+
+// ── IR event synthesis state ──────────────────────────────────────────────────
+
+static struct {
+    uint32_t protocol_id;
+    uint64_t code;
+    int64_t  press_us;          // when the press event was fired
+    int64_t  last_received_us;  // when the last same-code was received
+    bool     long_press_fired;
+    bool     active;
+} ir_state = {};
+
+// ── IR event stub ─────────────────────────────────────────────────────────────
+
+void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
+{
+    // stub — replace with real dispatch
+}
 
 // ── ISR callback ──────────────────────────────────────────────────────────────
 //
@@ -59,9 +82,55 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-void onDecoded(const IrProtocol& protocol, uint64_t data) {
+void onDecoded(const IrProtocol& protocol, uint64_t data)
+{
     VERBOSE("Decoded %s: 0x%016llX\n", protocol.name, data);
-    applyActivityBinding(protocol.id, data);
+
+    int64_t now = esp_timer_get_time();
+
+    // Normalise repeat indicator: treat it as the last code for this protocol.
+    // If there's no matching active press, ignore the repeat packet entirely.
+    uint64_t code = data;
+    if (data == IR_REPEAT_CODE) {
+        if (!ir_state.active || ir_state.protocol_id != protocol.id)
+            return;
+        code = ir_state.code;
+    }
+
+    // Is this the same key as the one currently held, within the repeat window?
+    bool same_code     = ir_state.active &&
+                         ir_state.protocol_id == protocol.id &&
+                         ir_state.code == code;
+    bool within_window = same_code &&
+                         (now - ir_state.last_received_us) < PRESS_TIMEOUT_US;
+
+    if (within_window) {
+        // ── Repeat ────────────────────────────────────────────────────────────
+        ir_state.last_received_us = now;
+        onIrEvent(protocol.id, ir_state.code, IrEventKind::Repeat);
+
+        // Long press fires once, after 500 ms of continuous holding
+        if (!ir_state.long_press_fired &&
+            (now - ir_state.press_us) >= LONG_PRESS_US) {
+            ir_state.long_press_fired = true;
+            onIrEvent(protocol.id, ir_state.code, IrEventKind::LongPress);
+        }
+    } else {
+        // ── Release old key (if any), then press the new one ──────────────────
+        if (ir_state.active) {
+            onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
+            ir_state.active = false;
+        }
+
+        ir_state.protocol_id       = protocol.id;
+        ir_state.code              = code;
+        ir_state.press_us          = now;
+        ir_state.last_received_us  = now;
+        ir_state.long_press_fired  = false;
+        ir_state.active            = true;
+
+        onIrEvent(protocol.id, code, IrEventKind::Press);
+    }
 }
 
 
@@ -133,6 +202,15 @@ void pollIrRx()
 {
     if (IR_RX_PIN < 0)
         return;
+
+    // Synthesise a release if no same-code has arrived within the repeat window
+    if (ir_state.active) {
+        int64_t now = esp_timer_get_time();
+        if ((now - ir_state.last_received_us) >= PRESS_TIMEOUT_US) {
+            onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
+            ir_state.active = false;
+        }
+    }
 
     static int64_t last_end_us = -1;
 
