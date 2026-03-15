@@ -17,6 +17,11 @@ const bindingType = {
 };
 registerEnum("binding_type", bindingType);
 
+const bindingFlags = {
+    continue_routing: 1,
+};
+registerEnum("binding_flags", bindingFlags);
+
 
 let types = [
 
@@ -165,6 +170,9 @@ let types = [
     },
     fields: [
         { name: "type", type: "uint" },
+        { name: "flags", type: "uint", default: 0 },
+        { name: "ops", type: "length" },
+        { name: "ops", type: "op**" },       // Ops to execute
     ]
 },
 
@@ -175,8 +183,6 @@ let types = [
         { name: "protocol", type: "uint" },             // protocol name (riff)
         { name: "modifier", type: "ulong" },            // zero for non-modified
         { name: "value", type: "ulong" },               // ir code
-        { name: "ops", type: "length" },
-        { name: "ops", type: "op**" },       // Ops to execute
     ]
 },
 

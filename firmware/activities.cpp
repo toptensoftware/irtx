@@ -367,6 +367,7 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
     unsigned long now = millis();
 
     // 1. If a modifier is pending, look for a modifier+key binding first.
+    bool modifierConsumed = false;
     if (s_modifierProtocol != 0 && now < s_modifierExpiry)
     {
         for (uint32_t i = 0; i < act->bindings_count; i++)
@@ -379,11 +380,17 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
                 bir->value     == value)
             {
                 VERBOSE("Activities: modifier+key binding matched\n");
-                s_modifierProtocol = 0;
-                enqueueOps(bir->ops, bir->ops_count);
-                return;
+                modifierConsumed = true;
+                enqueueOps(b->ops, b->ops_count);
+                if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
+                {
+                    s_modifierProtocol = 0;
+                    return;
+                }
             }
         }
+        if (modifierConsumed)
+            s_modifierProtocol = 0;
     }
 
     // 2. Look for an unmodified binding.
@@ -395,8 +402,9 @@ void applyActivityBinding(uint32_t protocol, uint64_t value)
         if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value)
         {
             VERBOSE("Activities: binding matched\n");
-            enqueueOps(bir->ops, bir->ops_count);
-            return;
+            enqueueOps(b->ops, b->ops_count);
+            if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
+                return;
         }
     }
 
