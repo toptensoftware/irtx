@@ -135,6 +135,7 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
         ir_state.press_us          = now;
         ir_state.last_received_us  = now;
         ir_state.long_press_fired  = false;
+        ir_state.suppress_release  = false;
         ir_state.active            = true;
 
         onIrEvent(protocol.id, code, IrEventKind::Press);
