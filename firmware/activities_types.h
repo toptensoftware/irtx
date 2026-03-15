@@ -19,6 +19,9 @@ extern "C" {
 // binding_type
 #define BINDING_TYPE_IR 1
 
+// binding_flags
+#define BINDING_FLAGS_CONTINUE_ROUTING 1
+
 // Forward declarations
 typedef struct activitiesRoot activitiesRoot;
 typedef struct device device;
@@ -151,17 +154,18 @@ struct __attribute__((packed)) switchActivityOp
 struct __attribute__((packed)) binding
 {
 	/*    0 */	uint32_t type;
-	/*    4 */	uint32_t ops_count;
-	/*    8 */	op** ops;
+	/*    4 */	uint32_t flags;
+	/*    8 */	uint32_t ops_count;
+	/*   12 */	op** ops;
 };
 
 // bindingIr
 struct __attribute__((packed)) bindingIr
 {
 	/*    0 */	binding base;
-	/*   12 */	uint32_t protocol;
-	/*   16 */	uint64_t modifier;
-	/*   24 */	uint64_t value;
+	/*   16 */	uint32_t protocol;
+	/*   20 */	uint64_t modifier;
+	/*   28 */	uint64_t value;
 };
 
 #ifdef __cplusplus
