@@ -26,6 +26,12 @@ extern "C" {
 // binding_flags
 #define BINDING_FLAGS_CONTINUE_ROUTING 1
 
+// ir_event_kind_mask
+#define IR_EVENT_KIND_PRESS      1
+#define IR_EVENT_KIND_REPEAT     2
+#define IR_EVENT_KIND_LONG_PRESS 4
+#define IR_EVENT_KIND_RELEASE    8
+
 // Forward declarations
 typedef struct activitiesRoot activitiesRoot;
 typedef struct device device;
@@ -197,8 +203,9 @@ struct __attribute__((packed)) bindingIr
 {
 	/*    0 */	binding base;
 	/*   16 */	uint32_t protocol;
-	/*   20 */	uint64_t modifier;
-	/*   28 */	uint64_t value;
+	/*   20 */	uint32_t eventMask;
+	/*   24 */	uint64_t modifier;
+	/*   32 */	uint64_t value;
 };
 
 // bindingIrAny

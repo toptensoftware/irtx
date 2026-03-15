@@ -2,12 +2,12 @@
 
 #include <stdint.h>
 
-enum class IrEventKind
+enum class IrEventKind : uint32_t
 {
-    Press,
-    Repeat,
-    LongPress,
-    Release,
+    Press     = 1,
+    Repeat    = 2,
+    LongPress = 4,
+    Release   = 8,
 };
 
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind);

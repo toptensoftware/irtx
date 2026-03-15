@@ -61,7 +61,7 @@ static struct {
 
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
 {
-    // stub — replace with real dispatch
+    applyActivityBinding(protocol_id, code, kind);
 }
 
 void suppressRelease()
