@@ -54,6 +54,7 @@ static struct {
     int64_t  last_received_us;  // when the last same-code was received
     bool     long_press_fired;
     bool     active;
+    bool     suppress_release;
 } ir_state = {};
 
 // ── IR event stub ─────────────────────────────────────────────────────────────
@@ -61,6 +62,11 @@ static struct {
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
 {
     // stub — replace with real dispatch
+}
+
+void suppressRelease()
+{
+    ir_state.suppress_release = true;
 }
 
 // ── ISR callback ──────────────────────────────────────────────────────────────
@@ -118,8 +124,10 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
     } else {
         // ── Release old key (if any), then press the new one ──────────────────
         if (ir_state.active) {
-            onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
-            ir_state.active = false;
+            if (!ir_state.suppress_release)
+                onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
+            ir_state.active            = false;
+            ir_state.suppress_release  = false;
         }
 
         ir_state.protocol_id       = protocol.id;
@@ -127,6 +135,7 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
         ir_state.press_us          = now;
         ir_state.last_received_us  = now;
         ir_state.long_press_fired  = false;
+        ir_state.suppress_release  = false;
         ir_state.active            = true;
 
         onIrEvent(protocol.id, code, IrEventKind::Press);
@@ -207,8 +216,10 @@ void pollIrRx()
     if (ir_state.active) {
         int64_t now = esp_timer_get_time();
         if ((now - ir_state.last_received_us) >= PRESS_TIMEOUT_US) {
-            onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
-            ir_state.active = false;
+            if (!ir_state.suppress_release)
+                onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
+            ir_state.active            = false;
+            ir_state.suppress_release  = false;
         }
     }
 
