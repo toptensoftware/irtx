@@ -69,6 +69,36 @@ void suppressRelease()
     ir_state.suppress_release = true;
 }
 
+void simulateIrRx(uint32_t protocol, uint64_t code, uint32_t eventKindMask)
+{
+    if (eventKindMask == 0)
+    {
+        // Call edge-detection logic (event synthesis via onDecoded)
+        const IrProtocol* p = getIrProtocolById(protocol);
+        if (!p)
+        {
+            LOG("simulateIrRx: unknown protocol 0x%08X\n", protocol);
+            return;
+        }
+        onDecoded(*p, code);
+    }
+    else
+    {
+        // Call activity dispatch logic directly for each requested event kind
+        static const IrEventKind kinds[] = {
+            IrEventKind::Press,
+            IrEventKind::Repeat,
+            IrEventKind::LongPress,
+            IrEventKind::Release,
+        };
+        for (auto kind : kinds)
+        {
+            if (eventKindMask & (uint32_t)kind)
+                onIrEvent(protocol, code, kind);
+        }
+    }
+}
+
 // ── ISR callback ──────────────────────────────────────────────────────────────
 //
 // Called by the RMT driver (in ISR context) when an idle timeout ends a frame.
