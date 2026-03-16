@@ -39,7 +39,7 @@ void setupWifi()
     {
         delay(500);
         toggle = !toggle;
-        ledColor(0, 0, toggle ? 4 : 0);
+        setLed(LED_PRIORITY_CONNECTIVITY, toggle ? 0x000004 : 0);
     }
     LOG("Connected! IP: %s\n", WiFi.localIP().toString().c_str());
 
@@ -95,12 +95,12 @@ void pollWifi()
     // WiFi reconnect
     if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED)
     {
-        ledColor(4, 2, 0);
+        setLed(LED_PRIORITY_CONNECTIVITY, 0x040200);
         LOG("WiFi disconnected, reconnecting...\n");
         WiFi.reconnect();
         while (WiFi.status() != WL_CONNECTED) delay(500);
         LOG("Reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
-        ledColor(0, 4, 0);
+        setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);
     }
 
 

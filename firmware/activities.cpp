@@ -222,10 +222,7 @@ static void startDelayOp(op* o)
 static void startLedOp(op* o)
 {
     ledOp* lo = (ledOp*)o;
-    uint8_t r = (lo->color >> 16) & 0xFF;
-    uint8_t g = (lo->color >> 8)  & 0xFF;
-    uint8_t b =  lo->color        & 0xFF;
-    ledColor(r, g, b);
+    setLed(LED_PRIORITY_USER, lo->color);
     if (lo->duration > 0)
     {
         s_currentOp     = o;
@@ -285,7 +282,7 @@ static bool pollLedOp(op* o)
     unsigned long now = millis();
     if (now >= s_opEndMs)
     {
-        ledColor(0, 4, 0);  // restore idle green
+        setLed(LED_PRIORITY_USER, 0xFFFFFFFF);
         return true;
     }
     ledOp* lo = (ledOp*)o;
@@ -293,11 +290,9 @@ static bool pollLedOp(op* o)
     {
         s_ledOn = !s_ledOn;
         if (s_ledOn)
-            ledColor((lo->color >> 16) & 0xFF,
-                     (lo->color >> 8)  & 0xFF,
-                      lo->color        & 0xFF);
+            setLed(LED_PRIORITY_USER, lo->color);
         else
-            ledColor(0, 0, 0);
+            setLed(LED_PRIORITY_USER, 0xFFFFFFFF);
         s_ledNextToggle = now + lo->period / 2;
     }
     return false;

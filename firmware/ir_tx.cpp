@@ -118,7 +118,7 @@ static void transmitTimingsNoLog(uint16_t* timings, int count, uint32_t gap)
     if (rmtSymbolCount == 0) return;
 
     // Show activity
-    ledColor(0, 64, 0);
+    setLed(LED_PRIORITY_ACTIVITY, 0x004000);    // Bright green
 
     // Transmit
     rmt_transmit_config_t txCfg = {};
@@ -129,13 +129,13 @@ static void transmitTimingsNoLog(uint16_t* timings, int count, uint32_t gap)
     if (err != ESP_OK)
     {
         LOG("IR: transmit error: %s\n", esp_err_to_name(err));
-        ledColor(4, 0, 0);
+        setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
         return;
     }
     rmt_tx_wait_all_done(txChannel, portMAX_DELAY);
 
     // Clear activity
-    ledColor(0, 2, 0);
+    setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
 }
 
 // ---- IR Packet Handler ----

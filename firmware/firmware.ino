@@ -25,7 +25,7 @@
 
 void setup()
 {
-    ledColor(4, 2, 0); // orange = starting
+    setLed(LED_PRIORITY_CONNECTIVITY, 0x040200);    // Orange (busy)
 
     Serial.begin(115200);
     delay(2000);
@@ -40,7 +40,7 @@ void setup()
     setupHttp();
     setupBle();
 
-    ledColor(0, 4, 0); // green = ready
+    setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);    // Green (ready)
 }
 
 void loop()

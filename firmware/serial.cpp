@@ -49,7 +49,6 @@ void handleCommand(const char* line)
             udp.begin(UDP_PORT);
             LOG("Listening for UDP on port %d\n", UDP_PORT);
         }
-        ledColor(0, 4, 0);
 
     }
     else if (strncmp(line, "name ", 5) == 0)
@@ -86,10 +85,12 @@ void handleCommand(const char* line)
     else if (strncmp(line, "led ", 4) == 0)
     {
         int r, g, b;
-        if (sscanf(line + 4, "%d %d %d", &r, &g, &b) == 3)
-            ledColor((uint8_t)r, (uint8_t)g, (uint8_t)b);
+        if (strcmp(line + 4, "clear") == 0)
+            setLed(LED_PRIORITY_USER, 0xFFFFFFFF);
+        else if (sscanf(line + 4, "%d %d %d", &r, &g, &b) == 3)
+            setLed(LED_PRIORITY_USER, ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF));
         else
-            LOG("Usage: led <r> <g> <b>\n");
+            LOG("Usage: led [ clear | <r> <g> <b> ]\n");
     }
     else if (strncmp(line, "activity ", 9) == 0)
     {

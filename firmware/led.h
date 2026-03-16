@@ -1,14 +1,8 @@
 #pragma once
 
-#include <Arduino.h>
-#include "config.h"
+#define LED_PRIORITY_CONNECTIVITY 0
+#define LED_PRIORITY_USER         1
+#define LED_PRIORITY_UNUSED       2
+#define LED_PRIORITY_ACTIVITY     3
 
-// ---- Status LED (onboard WS2812) ----
-inline void ledColor(uint8_t r, uint8_t g, uint8_t b)
-{
-#ifdef CONFIG_IDF_TARGET_ESP32C6
-    neopixelWrite(LED_PIN, g, r, b);  // LED on C6 board uses RGB order instead of GRB
-#else
-    neopixelWrite(LED_PIN, r, g, b);
-#endif
-}
+void setLed(int priority, uint32_t color);
