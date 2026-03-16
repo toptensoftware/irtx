@@ -47,6 +47,7 @@ void loop()
 {
     pollSerial();
     pollIrRx();
+    pollIrTx();
     pollWifi();
     pollHttp();
     pollActivities();

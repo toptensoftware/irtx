@@ -11,6 +11,7 @@ extern activitiesRoot* activitiesConfig;
 void setupActivities();
 void pollActivities();
 bool reloadActivities();
+bool isActivitiesBusy();
 
 // Enqueue an array of op pointers into the execution ring buffer.
 void enqueueOps(op** ops, uint32_t count);

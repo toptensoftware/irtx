@@ -11,17 +11,88 @@
 static rmt_channel_handle_t txChannel   = NULL;
 static rmt_encoder_handle_t copyEncoder = NULL;
 
-int64_t availableTime;
+// ---- Symbols buffer ----
+// Free immediately after rmt_transmit() returns (copy encoder copies to RMT memory).
+static rmt_symbol_word_t s_rmtSymbols[MAX_TIMING_VALUES];
+static int               s_rmtSymbolCount = 0;
 
-// ---- Buffers ----
-static uint16_t          timingValues[MAX_TIMING_VALUES + 1];
-static rmt_symbol_word_t rmtSymbols[MAX_TIMING_VALUES];
-static int               rmtSymbolCount = 0;
+// ---- In-flight state ----
+// Tracks the RMT transmission and the inter-packet gap that follows it.
+static bool     s_rmtBusy     = false;
+static uint32_t s_currentGap  = 0;
+static bool     s_gapWaiting  = false;
+static int64_t  s_gapExpiresAt = 0;
+
+// ---- Pending slot ----
+// Holds the next transmission while the in-flight slot is busy.
+static uint16_t s_pendingTimings[MAX_TIMING_VALUES + 1];
+static int      s_pendingCount = 0;
+static uint32_t s_pendingGap  = 0;
+static bool     s_hasPending  = false;
+
+// ---- Build RMT Symbols ----
+static void buildRmtSymbols(uint16_t* timings, int count)
+{
+    struct Phase { uint8_t level; uint16_t duration; };
+    static Phase phases[MAX_TIMING_VALUES * 2];
+    int phaseCount = 0;
+
+    for (int i = 0; i < count; i++)
+    {
+        uint8_t level = (i % 2 == 0) ? 1 : 0;
+        uint16_t remaining = timings[i];
+        while (remaining > 0 && phaseCount < MAX_TIMING_VALUES * 2)
+        {
+            uint16_t chunk = (remaining > 32767) ? 32767 : remaining;
+            phases[phaseCount++] = {level, chunk};
+            remaining -= chunk;
+        }
+    }
+
+    s_rmtSymbolCount = 0;
+    for (int i = 0; i < phaseCount; i += 2)
+    {
+        s_rmtSymbols[s_rmtSymbolCount].level0    = phases[i].level;
+        s_rmtSymbols[s_rmtSymbolCount].duration0 = phases[i].duration;
+        if (i + 1 < phaseCount)
+        {
+            s_rmtSymbols[s_rmtSymbolCount].level1    = phases[i+1].level;
+            s_rmtSymbols[s_rmtSymbolCount].duration1 = phases[i+1].duration;
+        }
+        else
+        {
+            s_rmtSymbols[s_rmtSymbolCount].level1    = 0;
+            s_rmtSymbols[s_rmtSymbolCount].duration1 = 0;
+        }
+        s_rmtSymbolCount++;
+    }
+}
+
+// ---- Start an RMT transmission (non-blocking) ----
+// s_rmtSymbols must already be built. Buffer is free after this returns.
+static void startTransmit(uint32_t gap)
+{
+    rmt_transmit_config_t txCfg = {};
+    txCfg.loop_count = 0;
+    esp_err_t err = rmt_transmit(txChannel, copyEncoder,
+                                 s_rmtSymbols,
+                                 s_rmtSymbolCount * sizeof(rmt_symbol_word_t),
+                                 &txCfg);
+    if (err != ESP_OK)
+    {
+        LOG("IR: transmit error: %s\n", esp_err_to_name(err));
+        return;
+    }
+    // s_rmtSymbols is now free — copy encoder has transferred to RMT memory.
+    setLed(LED_PRIORITY_ACTIVITY, 0x004000);    // Bright green
+    s_rmtBusy    = true;
+    s_currentGap = gap;
+}
 
 // ---- RMT Setup ----
 void setupIrTx()
 {
-    if (IR_RX_PIN < 0) {
+    if (IR_TX_PIN < 0) {
         LOG("IR TX disabled (no pin assigned)\n");
         return;
     }
@@ -46,96 +117,74 @@ void setupIrTx()
     LOG("RMT TX initialized on GPIO %d, Carrier: %d Hz\n", IR_TX_PIN, CARRIER_FREQ);
 }
 
-// ---- Build RMT Symbols ----
-static void buildRmtSymbols(uint16_t* timings, int count)
+// ---- Busy check ----
+bool isIrTxBusy()
 {
-    struct Phase { uint8_t level; uint16_t duration; };
-    static Phase phases[MAX_TIMING_VALUES * 2];
-    int phaseCount = 0;
+    return s_rmtBusy || s_gapWaiting || s_hasPending;
+}
 
-    for (int i = 0; i < count; i++)
+// ---- Poll ----
+void pollIrTx()
+{
+    if (txChannel == NULL) return;
+
+    // Check if RMT hardware has finished
+    if (s_rmtBusy)
     {
-        uint8_t level = (i % 2 == 0) ? 1 : 0;
-        uint16_t remaining = timings[i];
-        while (remaining > 0 && phaseCount < MAX_TIMING_VALUES * 2)
+        if (rmt_tx_wait_all_done(txChannel, 0) == ESP_OK)
         {
-            uint16_t chunk = (remaining > 32767) ? 32767 : remaining;
-            phases[phaseCount++] = {level, chunk};
-            remaining -= chunk;
+            s_gapExpiresAt = esp_timer_get_time() + s_currentGap;
+            s_gapWaiting   = true;
+            s_rmtBusy      = false;
+            setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
         }
     }
 
-    rmtSymbolCount = 0;
-    for (int i = 0; i < phaseCount; i += 2)
+    // Check if inter-packet gap has expired
+    if (s_gapWaiting && esp_timer_get_time() >= s_gapExpiresAt)
+        s_gapWaiting = false;
+
+    // Start pending transmission once both RMT and gap are clear
+    if (!s_rmtBusy && !s_gapWaiting && s_hasPending)
     {
-        rmtSymbols[rmtSymbolCount].level0    = phases[i].level;
-        rmtSymbols[rmtSymbolCount].duration0 = phases[i].duration;
-        if (i + 1 < phaseCount)
-        {
-            rmtSymbols[rmtSymbolCount].level1    = phases[i+1].level;
-            rmtSymbols[rmtSymbolCount].duration1 = phases[i+1].duration;
-        }
-        else
-        {
-            rmtSymbols[rmtSymbolCount].level1    = 0;
-            rmtSymbols[rmtSymbolCount].duration1 = 0;
-        }
-        rmtSymbolCount++;
+        s_hasPending = false;
+        buildRmtSymbols(s_pendingTimings, s_pendingCount);
+        if (s_rmtSymbolCount > 0)
+            startTransmit(s_pendingGap);
     }
 }
-
-// ---- Common Transmit Helper ----
-static void transmitTimings(uint16_t* timings, int count, uint32_t gap)
-{
-    VERBOSE("IR TX: timings: [%i] gap: %i\n", count, gap);
-    transmitTimings(timings, count, gap);
-}
-
 
 // ---- Common Transmit Helper ----
 static void transmitTimingsNoLog(uint16_t* timings, int count, uint32_t gap)
 {
-    // Make sure even count
+    if (txChannel == NULL) return;
+
+    // Ensure even count
     if (count % 2 != 0)
     {
         timings[count] = 0;
         count++;
     }
 
-    // Sum up the total length
-    int timingLength = 0;
-    for (int i = 0; i < count; i++)
-        timingLength += timings[i];
-
-    // Enforce gap between transmissions
-    int64_t now = esp_timer_get_time();
-    if (availableTime > 0 && now < availableTime)
-        delayMicroseconds(availableTime - now);
-    availableTime = now + timingLength + gap;
-
-    // Setup RMT
-    buildRmtSymbols(timings, count);
-    if (rmtSymbolCount == 0) return;
-
-    // Show activity
-    setLed(LED_PRIORITY_ACTIVITY, 0x004000);    // Bright green
-
-    // Transmit
-    rmt_transmit_config_t txCfg = {};
-    txCfg.loop_count = 0;
-    esp_err_t err = rmt_transmit(txChannel, copyEncoder,
-                                 rmtSymbols, rmtSymbolCount * sizeof(rmt_symbol_word_t),
-                                 &txCfg);
-    if (err != ESP_OK)
+    if (!s_rmtBusy && !s_gapWaiting)
     {
-        LOG("IR: transmit error: %s\n", esp_err_to_name(err));
-        setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
-        return;
+        // Nothing in flight — transmit immediately
+        buildRmtSymbols(timings, count);
+        if (s_rmtSymbolCount > 0)
+            startTransmit(gap);
     }
-    rmt_tx_wait_all_done(txChannel, portMAX_DELAY);
-
-    // Clear activity
-    setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
+    else if (!s_hasPending)
+    {
+        // Queue for after current transmission + gap
+        memcpy(s_pendingTimings, timings, count * sizeof(uint16_t));
+        s_pendingCount = count;
+        s_pendingGap   = gap;
+        s_hasPending   = true;
+    }
+    else
+    {
+        LOG("IR TX: busy, dropping transmission\n");
+    }
 }
 
 // ---- IR Packet Handler ----
@@ -161,9 +210,13 @@ void handleIrPacket(uint8_t* data, int length)
 
     int timingBytes = length - IR_HEADER_SIZE;
     int timingCount = timingBytes / 2;
-    memcpy(timingValues, data + IR_HEADER_SIZE, timingBytes);
 
-    transmitTimings(timingValues, timingCount, gap);
+    // Local buffer needed: transmitTimingsNoLog may write one padding element
+    uint16_t timings[MAX_TIMING_VALUES + 1];
+    memcpy(timings, data + IR_HEADER_SIZE, timingBytes);
+
+    VERBOSE("IR TX: timings: [%i] gap: %i\n", timingCount, gap);
+    transmitTimingsNoLog(timings, timingCount, gap);
 }
 
 // ---- IR Code Handler ----
@@ -197,9 +250,10 @@ void handleIrCode(uint32_t protocolId, uint64_t code, bool repeat)
         return;
     }
 
+    uint16_t timings[MAX_TIMING_VALUES + 1];
     int count = 0;
     int gap   = 0;
-    ir_encode(*protocol, code, repeat, timingValues, &count, &gap);
+    ir_encode(*protocol, code, repeat, timings, &count, &gap);
 
     if (count <= 0)
     {
@@ -208,6 +262,5 @@ void handleIrCode(uint32_t protocolId, uint64_t code, bool repeat)
     }
 
     VERBOSE("IR TX: protocol: 0x%08X code: 0x%016llX repeat: %i\n", protocolId, code, repeat ? 1 : 0);
-
-    transmitTimingsNoLog(timingValues, count, (uint32_t)gap);
+    transmitTimingsNoLog(timings, count, (uint32_t)gap);
 }
