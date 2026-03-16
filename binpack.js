@@ -29,6 +29,28 @@ export const irEventKindMask = {
 };
 
 
+
+/**
+ * Encodes a 4-character ASCII string as a little-endian 32-bit RIFF FourCC integer.
+ * @param {string} a - A string of up to 4 characters (padded with spaces if shorter).
+ * @returns {number} The FourCC value as a 32-bit integer.
+ */
+export function riff(a)
+{
+    if (typeof(a) === "string")
+    {
+        while (a.length < 4)
+            a = a + " ";
+
+        return (a.charCodeAt(0)) |
+            (a.charCodeAt(1) << 8) |
+            (a.charCodeAt(2) << 16) |
+            (a.charCodeAt(3) << 24);
+    }
+    throw new Error("Invalid riff value");
+}
+
+
 let types = [
 
 { name: "op", enum: opId },
@@ -79,6 +101,20 @@ let types = [
 
 {
     name: "op",
+    packMapper: (value) => {
+        if (typeof value == "string")
+        {
+            if (value === "*")
+                return { op: opId.send_ir, protocol: 0, irCode: 0n }
+            if (value.startsWith("http://"))
+                return { op: opId.http_get, url: value }
+
+            let m = value.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
+            return { op: opId.send_ir, protocol: riff(m[1]), irCode: BigInt("0x" + m[2])}
+
+        }
+        return value;
+    },
     resolveVirtualType: (val) => {
         switch (val.op)
         {
@@ -204,6 +240,38 @@ let types = [
 
 {
     name: "binding",
+    packMapper: (value) => {
+
+        // Map string args
+        value = Object.assign({}, value);
+        if (value.on)
+        {
+            if (value.on === "*")
+            {
+                // Any IR Code
+                value = { type: bindingType.ir_any , ...value };
+            }
+            else
+            {
+                // <protocol>:<modifier>+<ircode>
+                let m = value.on.match(/^([A-Z0-9]+):(?:0x)?(?:([a-fA-F0-9]+)\+)?(?:0x)?([a-fA-F0-9]+)?/);
+                value.type = bindingType.ir;
+                value.protocol = riff(m[1]);
+                value.modifier = m[2] ? BigInt("0x" + m[2]) : 0n;
+                value.value = BigInt("0x" + m[3]);
+            }
+
+            delete value.on;
+        }
+        if (value.op)
+        {
+            value.ops = [ value.op ];
+            delete value.op;
+        }
+        if (!Array.isArray(value.ops))
+            value.ops = [ value.ops ];
+        return value;
+    },
     resolveVirtualType: (val) => {
         switch (val.type)
         {
@@ -224,7 +292,7 @@ let types = [
     baseType: "binding",
     fields: [
         { name: "protocol",  type: "uint" },                                    // protocol name (riff)
-        { name: "eventMask", type: "uint", default: 0x1 },                      // bitmask of IrEventKind values to match (0xF = all)
+        { name: "eventMask", type: "uint", default: irEventKindMask.press },                      // bitmask of IrEventKind values to match (0xF = all)
         { name: "modifier",  type: "ulong" },                                   // zero for non-modified
         { name: "value",     type: "ulong" },                                   // ir code
     ]

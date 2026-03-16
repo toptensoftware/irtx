@@ -1,5 +1,3 @@
-import { bindingType, opId } from "./binpack.js";
-
 const activitiesRoot = {
     version: 1,
     devices: [
@@ -30,29 +28,36 @@ const activitiesRoot = {
             devices: [ ],
             bindings: [
                 {
-                    type: bindingType.ir,
-                    protocol: 0x414E4150,
-                    modifier: 0x000040040D08BCB9,
-                    value: 0x000040040D08080D,
-                    ops: [
-                        { op: opId.http_get, url: "http://10.1.1.125:3000/act1" },
-                    ]
+                    // Power + btn 1
+                    on: "PANA:40040D08BCB9+40040D08080D",
+                    op: "http://10.1.1.125:3000/act1",
                 },
+
                 {
-                    type: bindingType.ir,
-                    protocol: 0x414E4150,
-                    modifier: 0x000040040D08BCB9,
-                    value: 0x000040040D08888D,
-                    ops: [
-                        { op: opId.http_get, url: "http://10.1.1.125:3000/act2" },
-                    ]
+                    // Power + btn 2
+                    on: "PANA:40040D08BCB9+40040D08888D",
+                    op: "http://10.1.1.125:3000/act2",
                 },
-                { 
-                    type: bindingType.ir_any,
-                    ops: [
-                        { op: opId.send_ir, protocol: 0, irCode: 0n }
-                    ]
+
+                {
+                    // Volume up
+                    on: "PANA:0000400401000405",
+                    eventMask: 0x03,        // enable repeat
+                    op: "http://"
                 },
+
+                {
+                    // Volume down
+                    on: "PANA:0000400401008485",
+                    eventMask: 0x03,        // enable repeat
+                    op: "http://"
+                },
+
+                {
+                    // Pass through all other IR Codes
+                    on: "*",
+                    op: "*",
+                }
             ]
         }
     ],
