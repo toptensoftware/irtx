@@ -682,6 +682,11 @@ static void activateInitial()
 
 // ---- Public API ----
 
+bool isActivitiesBusy()
+{
+    return !isQueueEmpty() || s_currentOp != nullptr;
+}
+
 void setupActivities()
 {
     if (loadActivities())

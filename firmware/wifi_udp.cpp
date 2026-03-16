@@ -59,10 +59,16 @@ void handleUdpPacket(uint8_t* data, int length)
     memcpy(&cmd, data, 2);
     switch (cmd)
     {
-        case 1: handleIrPacket(data, length);      break;
+        case 1:
+            if (isActivitiesBusy()) { LOG("UDP: IR packet dropped (activities busy)\n"); break; }
+            handleIrPacket(data, length);
+            break;
         case 2: handleBleConnectPacket(data, length);     break;
         case 3: handleBleHidPacket(data, length);     break;
-        case 4: handleIrCodePacket(data, length);      break;
+        case 4:
+            if (isActivitiesBusy()) { LOG("UDP: IR code packet dropped (activities busy)\n"); break; }
+            handleIrCodePacket(data, length);
+            break;
         case 5:
         {
             // [uint16 cmd=5][uint32 activityIndex]
