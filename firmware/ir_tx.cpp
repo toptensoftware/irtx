@@ -11,9 +11,7 @@
 static rmt_channel_handle_t txChannel   = NULL;
 static rmt_encoder_handle_t copyEncoder = NULL;
 
-// ---- Device State ----
-struct IrDeviceState { int64_t availableTime; };
-static IrDeviceState irDeviceStates[MAX_IR_DEVICES] = {};
+int64_t availableTime;
 
 // ---- Buffers ----
 static uint16_t          timingValues[MAX_TIMING_VALUES + 1];
@@ -87,7 +85,15 @@ static void buildRmtSymbols(uint16_t* timings, int count)
 }
 
 // ---- Common Transmit Helper ----
-static void transmitTimings(uint16_t irDevIdx, uint16_t* timings, int count, uint32_t gap)
+static void transmitTimings(uint16_t* timings, int count, uint32_t gap)
+{
+    VERBOSE("IR TX: timings: [%i] gap: %i\n", count, gap);
+    transmitTimings(timings, count, gap);
+}
+
+
+// ---- Common Transmit Helper ----
+static void transmitTimingsNoLog(uint16_t* timings, int count, uint32_t gap)
 {
     // Make sure even count
     if (count % 2 != 0)
@@ -96,19 +102,16 @@ static void transmitTimings(uint16_t irDevIdx, uint16_t* timings, int count, uin
         count++;
     }
 
-    VERBOSE("IR TX: dev: %i timings: [%i] gap: %i\n", (int)irDevIdx, count, gap);
-
     // Sum up the total length
     int timingLength = 0;
     for (int i = 0; i < count; i++)
         timingLength += timings[i];
 
-    // Enforce per-device gap between transmissions
-    IrDeviceState* dev = &irDeviceStates[irDevIdx];
+    // Enforce gap between transmissions
     int64_t now = esp_timer_get_time();
-    if (dev->availableTime > 0 && now < dev->availableTime)
-        delayMicroseconds(dev->availableTime - now);
-    dev->availableTime = now + timingLength + gap;
+    if (availableTime > 0 && now < availableTime)
+        delayMicroseconds(availableTime - now);
+    availableTime = now + timingLength + gap;
 
     // Setup RMT
     buildRmtSymbols(timings, count);
@@ -136,7 +139,7 @@ static void transmitTimings(uint16_t irDevIdx, uint16_t* timings, int count, uin
 }
 
 // ---- IR Packet Handler ----
-// [uint16 cmd=1][uint16 irDevIdx][uint32 carrierFreq][uint32 gap][uint16 timings...]
+// [uint16 cmd=1][uint16 reserved][uint32 carrierFreq][uint32 gap][uint16 timings...]
 void handleIrPacket(uint8_t* data, int length)
 {
     if (length < IR_HEADER_SIZE + 2)
@@ -145,18 +148,10 @@ void handleIrPacket(uint8_t* data, int length)
         return;
     }
 
-    uint16_t irDevIdx;
     uint32_t carrierFreq;
     uint32_t gap;
-    memcpy(&irDevIdx,    data + 2, 2);
     memcpy(&carrierFreq, data + 4, 4);
     memcpy(&gap,         data + 8, 4);
-
-    if (irDevIdx >= MAX_IR_DEVICES)
-    {
-        LOG("IR: device index out of range\n");
-        return;
-    }
 
     if (carrierFreq != 38000)
     {
@@ -168,12 +163,12 @@ void handleIrPacket(uint8_t* data, int length)
     int timingCount = timingBytes / 2;
     memcpy(timingValues, data + IR_HEADER_SIZE, timingBytes);
 
-    transmitTimings(irDevIdx, timingValues, timingCount, gap);
+    transmitTimings(timingValues, timingCount, gap);
 }
 
 // ---- IR Code Handler ----
 // Encodes a value using a named protocol and transmits it.
-// Packet layout: [uint16 cmd][uint16 devIdx][uint32 protocol][uint64 code][uint8 repeat]
+// Packet layout: [uint16 cmd][uint16 reserved][uint32 protocol][uint64 code][uint8 repeat]
 #define IR_CODE_PACKET_SIZE 17
 void handleIrCodePacket(uint8_t* data, int length)
 {
@@ -183,26 +178,18 @@ void handleIrCodePacket(uint8_t* data, int length)
         return;
     }
 
-    uint16_t irDevIdx;
     uint32_t protocolId;
     uint64_t code;
     uint8_t  repeat;
-    memcpy(&irDevIdx,    data + 2,  2);
     memcpy(&protocolId,  data + 4,  4);
     memcpy(&code,        data + 8,  8);
     memcpy(&repeat,      data + 16, 1);
 
-    handleIrCode(irDevIdx, protocolId, code, (bool)repeat);
+    handleIrCode(protocolId, code, (bool)repeat);
 }
 
-void handleIrCode(uint16_t irDevIdx, uint32_t protocolId, uint64_t code, bool repeat)
+void handleIrCode(uint32_t protocolId, uint64_t code, bool repeat)
 {
-    if (irDevIdx >= MAX_IR_DEVICES)
-    {
-        LOG("IR: device index out of range\n");
-        return;
-    }
-
     const IrProtocol* protocol = getIrProtocolById(protocolId);
     if (!protocol)
     {
@@ -220,7 +207,7 @@ void handleIrCode(uint16_t irDevIdx, uint32_t protocolId, uint64_t code, bool re
         return;
     }
 
-    VERBOSE("IR TX:  dev: %i protocol: 0x%08X code: 0x%016llX repeat: %i\n", (int)irDevIdx, protocolId, code, repeat ? 1 : 0);
+    VERBOSE("IR TX: protocol: 0x%08X code: 0x%016llX repeat: %i\n", protocolId, code, repeat ? 1 : 0);
 
-    transmitTimings(irDevIdx, timingValues, count, (uint32_t)gap);
+    transmitTimingsNoLog(timingValues, count, (uint32_t)gap);
 }

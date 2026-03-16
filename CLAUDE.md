@@ -49,7 +49,7 @@ The activity index is committed only after all transition ops have executed.
 1. On boot, `setupActivities()` loads `activities.bin` from LittleFS, relocates
    internal pointers, and activates activity 0.
 2. The main loop calls `pollActivities()` each cycle to drain the op queue.
-3. When an IR code is received, `applyActivityBinding()` is called. It searches
+3. When an IR code is received, `invokeBindings()` is called. It searches
    the current activity's binding list for a match and enqueues the bound ops.
 4. `switchActivity(index)` can be called externally (UDP cmd=5) or from a
    `switchActivityOp` inside a sequence.

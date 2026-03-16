@@ -227,7 +227,7 @@ Node.js clients can use the [irtx-node](https://github.com/toptensoftware/irtx-n
 To transmit an IR signal, send a UDP packet to port 4210 in the following format:
 
 * `uint16_t cmd` - must be 1
-* `uint16_t deviceIndex` - a user defined device index from 0 - 15 (see below)
+* `uint16_t reserved` - unused (used to be device index)
 * `uint32_t carrierFreq` - carrier frequency
 * `uint32_t gap` - a trailing gap (see below)
 * `uint16_t timingData[]` - IR code timing values
@@ -235,9 +235,6 @@ To transmit an IR signal, send a UDP packet to port 4210 in the following format
 (all values are little endian)
 
 The `cmd` value must be 1 and indicates this is an IR transmission packet
-
-The `deviceIndex` is used to enforce gaps between consecutive packets targeted at the same device.  Can be just set to zero
-to use the same gap timing between all.
 
 The `carrierFrequency` must be `38000` otherwise the packet is ignored (might add support for others later)
 
@@ -286,7 +283,7 @@ otherwise the packet will be dropped (check serial/telnet monitor if packets are
 To transmit an IR signal using a named protocol, send a UDP packet to port 4210 in the following format:
 
 * `uint16_t cmd` - must be 4
-* `uint16_t deviceIndex` - a user defined device index from 0 - 15 (same semantics as cmd 1)
+* `uint16_t reserved` - unused (used to be device index)
 * `uint32_t protocolId` - identifies the IR protocol (see below)
 * `uint64_t code` - the IR code value to transmit
 * `uint8_t repeat` - if non-zero, sends the protocol's repeat frame instead of a full code frame

@@ -29,6 +29,24 @@ const activitiesRoot = {
             name: "off",
             devices: [ ],
             bindings: [
+                {
+                    type: bindingType.ir,
+                    protocol: 0x414E4150,
+                    modifier: 0x000040040D08BCB9,
+                    value: 0x000040040D08080D,
+                    ops: [
+                        { op: opId.http_get, url: "http://10.1.1.125:3000/act1" },
+                    ]
+                },
+                {
+                    type: bindingType.ir,
+                    protocol: 0x414E4150,
+                    modifier: 0x000040040D08BCB9,
+                    value: 0x000040040D08888D,
+                    ops: [
+                        { op: opId.http_get, url: "http://10.1.1.125:3000/act2" },
+                    ]
+                },
                 { 
                     type: bindingType.ir_any,
                     ops: [

@@ -26,8 +26,7 @@
 
 // ---- Limits ----
 #define MAX_TIMING_VALUES  512
-#define MAX_IR_DEVICES     16
-#define IR_HEADER_SIZE     12  // uint16 cmd + uint16 irDevIdx + uint32 carrierFreq + uint32 gap
+#define IR_HEADER_SIZE     12  // uint16 cmd + uint16 unused + uint32 carrierFreq + uint32 gap
 #define INPUT_MAX          256
 
 extern Preferences prefs;

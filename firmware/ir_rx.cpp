@@ -73,7 +73,7 @@ const char* nameOfEventKind(IrEventKind kind)
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
 {
     VERBOSE("IR Event %s 0x%08X/%016llX\n", nameOfEventKind(kind), protocol_id, code);
-    applyActivityBinding(protocol_id, code, kind);
+    invokeBindings(protocol_id, code, kind);
 }
 
 // ── ISR callback ──────────────────────────────────────────────────────────────

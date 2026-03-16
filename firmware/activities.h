@@ -21,7 +21,7 @@ void enqueueOps(op** ops, uint32_t count);
 void switchActivity(int index);
 
 // Called by the IR RX path on every decoded code to check active bindings.
-void applyActivityBinding(uint32_t protocol, uint64_t value, IrEventKind kind);
+void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind);
 
 // Print activities/device status to the console.
 void statusActivities();

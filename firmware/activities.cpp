@@ -115,17 +115,17 @@ static void startSendIrOp(op* o)
     uint64_t code  = sio->protocol ? sio->irCode   : s_irReg.irCode;
     if (sio->ipAddr == 0)
     {
-        handleIrCode(0, proto, code, false);
+        handleIrCode(proto, code, false);
     }
     else
     {
         // Forward to a remote IRTX device via UDP cmd=4
         uint8_t  pkt[17];
         uint16_t cmd    = 4;
-        uint16_t devIdx = 0;
+        uint16_t unused = 0;
         uint8_t  repeat = 0;
         memcpy(pkt,      &cmd,    2);
-        memcpy(pkt + 2,  &devIdx, 2);
+        memcpy(pkt + 2,  &unused, 2);
         memcpy(pkt + 4,  &proto,  4);
         memcpy(pkt + 8,  &code,   8);
         memcpy(pkt + 16, &repeat, 1);
@@ -464,121 +464,105 @@ void switchActivity(int newIndex)
 }
 
 // ---- Binding matcher (called from IR RX on every decoded code) ----
-void applyActivityBinding(uint32_t protocol, uint64_t value, IrEventKind kind)
+void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
 {
-    if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
+    if (!activitiesConfig || activitiesConfig->activities_count == 0) 
+        return;
 
-    activity*     act = &activitiesConfig->activities[s_currentActivity];
+    activity* act = &activitiesConfig->activities[s_currentActivity];
     unsigned long now = millis();
-
-    // Prepend a setIrRegOp before the first binding's ops so the IR register
-    // reflects the received code throughout the sequence. Allocated once per
-    // call; if allocation fails the sequence still runs with a stale register.
-    bool irRegSet = false;
-    auto enqueueBindingOps = [&](binding* b)
-    {
-        if (!irRegSet)
-        {
-            setIrRegOp* sr = (setIrRegOp*)malloc(sizeof(setIrRegOp));
-            if (sr)
-            {
-                sr->base.op  = OP_SET_IR_REG | OP_FLAG_HEAP;
-                sr->protocol = protocol;
-                sr->irCode   = value;
-                enqueueOp((op*)sr);
-                irRegSet = true;
-            }
-            else
-            {
-                LOG("Activities: failed to alloc setIrRegOp\n");
-            }
-        }
-        enqueueOps(b->ops, b->ops_count);
-    };
-
     uint32_t kindMask = (uint32_t)kind;
 
-    // 1. If a modifier is pending, look for a modifier+key binding first.
-    bool modifierConsumed = false;
-    if (s_modifierProtocol != 0 && now < s_modifierExpiry)
+    // Reset modifier if timed out
+    if (s_modifierProtocol != 0 && now > s_modifierExpiry)
     {
-        for (uint32_t i = 0; i < act->bindings_count; i++)
-        {
-            binding* b = act->bindings[i];
-            if (b->type != BINDING_TYPE_IR) continue;
-            bindingIr* bir = (bindingIr*)b;
-            if (bir->protocol == protocol &&
-                bir->modifier  == s_modifierValue &&
-                bir->value     == value &&
-                (bir->eventMask & kindMask))
-            {
-                VERBOSE("Activities: modifier+key binding matched\n");
-                modifierConsumed = true;
-                if (kind == IrEventKind::LongPress)
-                    suppressRelease();
-                enqueueBindingOps(b);
-                if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
-                {
-                    s_modifierProtocol = 0;
-                    return;
-                }
-            }
-        }
-        if (modifierConsumed)
-            s_modifierProtocol = 0;
+        s_modifierProtocol = 0;
+        s_modifierValue = 0;
+        s_modifierExpiry = 0;
     }
 
-    // 2. Look for an unmodified binding.
+    // Check bindings
+    bool matchedAsModifier = false;
+    bool matchedAny = false;
     for (uint32_t i = 0; i < act->bindings_count; i++)
     {
         binding* b = act->bindings[i];
-        if (b->type != BINDING_TYPE_IR) continue;
-        bindingIr* bir = (bindingIr*)b;
-        if (bir->protocol == protocol && bir->modifier == 0 && bir->value == value &&
-            (bir->eventMask & kindMask))
+        bool matched = false;
+        switch (b->type)
         {
-            VERBOSE("Activities: binding matched\n");
+            case BINDING_TYPE_IR:
+            {
+                bindingIr* bir = (bindingIr*)b;
+
+                // Correct protocol?
+                if (bir->protocol != protocol)
+                    break;
+
+                // Correct modifier and value?
+                if ((bir->eventMask & kindMask) != 0 && 
+                    bir->value == value && 
+                    bir->protocol == s_modifierProtocol && 
+                    bir->modifier == s_modifierValue)
+                {
+                    // Matched
+                    matched = true;
+                }
+                else if (s_modifierProtocol == 0 && bir->modifier == value)
+                {
+                    // Modifier
+                    matchedAsModifier = true;
+                }
+                break;
+            }
+            
+            case BINDING_TYPE_IR_ANY:
+                matched = !matchedAsModifier && (kind == IrEventKind::Press || kind == IrEventKind::Repeat);
+                break;
+        }
+
+        if (matched)
+        {
+            matchedAny = true;
+
+            // Suppress release event
             if (kind == IrEventKind::LongPress)
                 suppressRelease();
-            enqueueBindingOps(b);
-            if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
-                return;
-        }
-    }
 
-    // 3. Check if this code arms a modifier for any binding in this activity.
-    //    Modifier codes do not set the IR register or trigger wildcard bindings.
-    if (kind == IrEventKind::Press)
-    {
-        for (uint32_t i = 0; i < act->bindings_count; i++)
-        {
-            binding* b = act->bindings[i];
-            if (b->type != BINDING_TYPE_IR) continue;
-            bindingIr* bir = (bindingIr*)b;
-            if (bir->modifier != 0 && bir->protocol == protocol && bir->modifier == value)
+            // Enqueue op to set the ir code register
+            setIrRegOp* sr = (setIrRegOp*)malloc(sizeof(setIrRegOp));
+            if (!sr)
             {
-                VERBOSE("Activities: modifier key armed 0x%016llX (timeout %ds)\n",
-                        value, MODIFIER_TIMEOUT_MS / 1000);
-                s_modifierProtocol = protocol;
-                s_modifierValue    = value;
-                s_modifierExpiry   = now + MODIFIER_TIMEOUT_MS;
-                return;
+                LOG("Activities: failed to alloc setIrRegOp\n");
+                break;
             }
+            sr->base.op  = OP_SET_IR_REG | OP_FLAG_HEAP;
+            sr->protocol = protocol;
+            sr->irCode   = value;
+            enqueueOp((op*)sr);
+
+            // Enqueue the binding's operations
+            enqueueOps(b->ops, b->ops_count);
+
+            // Quit routing?
+            if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
+                break;
         }
     }
 
-    // 4. Wildcard bindings — match any IR code not claimed above.
-    if (kind == IrEventKind::Press || kind == IrEventKind::Repeat)
+    // Update modifier state
+    if (matchedAny)
     {
-        for (uint32_t i = 0; i < act->bindings_count; i++)
-        {
-            binding* b = act->bindings[i];
-            if (b->type != BINDING_TYPE_IR_ANY) continue;
-            VERBOSE("Activities: wildcard binding matched\n");
-            enqueueBindingOps(b);
-            if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
-                return;
-        }
+        // Clear modifier
+        s_modifierProtocol = 0;
+        s_modifierValue = 0;
+        s_modifierExpiry = 0;
+    }
+    else if (matchedAsModifier)
+    {
+        // Set modifier
+        s_modifierProtocol = protocol;
+        s_modifierValue = value;
+        s_modifierExpiry = now + MODIFIER_TIMEOUT_MS;
     }
 }
 
