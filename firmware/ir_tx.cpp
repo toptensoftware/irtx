@@ -117,6 +117,12 @@ void setupIrTx()
     LOG("RMT TX initialized on GPIO %d, Carrier: %d Hz\n", IR_TX_PIN, CARRIER_FREQ);
 }
 
+// ---- Busy check ----
+bool isIrTxBusy()
+{
+    return s_rmtBusy || s_gapWaiting || s_hasPending;
+}
+
 // ---- Poll ----
 void pollIrTx()
 {

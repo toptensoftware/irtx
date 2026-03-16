@@ -109,6 +109,14 @@ typedef bool (*pollOpFn)(op*);
 
 static void startSendIrOp(op* o)
 {
+    // Defer execution to pollSendIrOp so we wait until IR TX is free.
+    s_currentOp = o;
+}
+
+static bool pollSendIrOp(op* o)
+{
+    if (isIrTxBusy()) return false;
+
     sendIrOp* sio = (sendIrOp*)o;
     // protocol == 0 means use the IR code register (pass-through).
     uint32_t proto = sio->protocol ? sio->protocol : s_irReg.protocol;
@@ -139,6 +147,7 @@ static void startSendIrOp(op* o)
         VERBOSE("Activities: IR -> %s 0x%08X:0x%016llX\n",
                 ip.toString().c_str(), proto, code);
     }
+    return true;
 }
 
 static void startSendWolOp(op* o)
@@ -318,8 +327,8 @@ static const startOpFn s_startOpTable[] = {
 static const uint32_t START_OP_TABLE_SIZE = sizeof(s_startOpTable) / sizeof(s_startOpTable[0]);
 
 static const pollOpFn s_pollOpTable[] = {
-    nullptr,      // 0 — unused
-    nullptr,      // OP_SEND_IR        = 1
+    nullptr,        // 0 — unused
+    pollSendIrOp,   // OP_SEND_IR        = 1
     nullptr,      // OP_SEND_WOL       = 2
     nullptr,      // OP_HTTP_GET        = 3
     nullptr,      // OP_HTTP_POST       = 4
