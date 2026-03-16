@@ -43,14 +43,14 @@ const activitiesRoot = {
                     // Volume up
                     on: "PANA:0000400401000405",
                     eventMask: 0x03,        // enable repeat
-                    op: "http://"
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=up",
                 },
 
                 {
                     // Volume down
                     on: "PANA:0000400401008485",
                     eventMask: 0x03,        // enable repeat
-                    op: "http://"
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down",
                 },
 
                 {

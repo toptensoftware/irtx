@@ -36,7 +36,7 @@
 #define LONG_BREAK_US       5000000ULL  // threshold for "long break" label (5 s)
 
 #define IR_REPEAT_CODE      0xFFFFFFFFFFFFFFFFULL
-#define PRESS_TIMEOUT_US    200000LL    // 200 ms — same code within this window is a repeat
+#define PRESS_TIMEOUT_US    250000LL    // 200 ms — same code within this window is a repeat
 #define LONG_PRESS_US       500000LL    // 500 ms since press → synthesize long-press
 
 // ── Globals ───────────────────────────────────────────────────────────────────

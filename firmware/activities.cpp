@@ -160,7 +160,7 @@ static void startSendWolOp(op* o)
     udp.beginPacket(IPAddress(255, 255, 255, 255), 9);
     udp.write(magic, sizeof(magic));
     udp.endPacket();
-    LOG("Activities: WoL -> %02X:%02X:%02X:%02X:%02X:%02X\n",
+    VERBOSE("Activities: WoL -> %02X:%02X:%02X:%02X:%02X:%02X\n",
         wol->macaddr[0], wol->macaddr[1], wol->macaddr[2],
         wol->macaddr[3], wol->macaddr[4], wol->macaddr[5]);
 }
@@ -176,7 +176,7 @@ static void startHttpGetOp(op* o)
         http.begin(hg->url);
         int code = http.GET();
         s_stringReg = (code > 0) ? http.getString() : "";
-        LOG("Activities: HTTP GET %s -> %d\n", hg->url, code);
+        VERBOSE("Activities: HTTP GET %s -> %d\n", hg->url, code);
         http.end();
     }
     else
@@ -196,7 +196,7 @@ static void startHttpPostOp(op* o)
         if (hp->contentType)     http.addHeader("Content-Type",     hp->contentType);
         if (hp->contentEncoding) http.addHeader("Content-Encoding", hp->contentEncoding);
         int code = http.POST(hp->data, hp->data_count);
-        LOG("Activities: HTTP POST %s -> %d\n", hp->url, code);
+        VERBOSE("Activities: HTTP POST %s -> %d\n", hp->url, code);
         http.end();
     }
     else
@@ -258,7 +258,7 @@ static void startSearchStringOp(op* o)
 {
     searchStringOp* ss = (searchStringOp*)o;
     s_boolReg = s_stringReg.indexOf(ss->matchString) >= 0;
-    LOG("Activities: search '%s' -> %s\n",
+    VERBOSE("Activities: search '%s' -> %s\n",
         ss->matchString, s_boolReg ? "true" : "false");
 }
 
@@ -275,7 +275,7 @@ static void startCommitOp(op* o)
 {
     CommitOp* co = (CommitOp*)o;
     s_currentActivity = (int)co->newIndex;
-    LOG("Activities: active '%s'\n",
+    VERBOSE("Activities: active '%s'\n",
         activitiesConfig->activities[s_currentActivity].name);
 }
 
@@ -410,7 +410,7 @@ void switchActivity(int newIndex)
     activity* oldAct = &activitiesConfig->activities[s_currentActivity];
     activity* newAct = &activitiesConfig->activities[newIndex];
 
-    LOG("Activities: '%s' -> '%s'\n", oldAct->name, newAct->name);
+    VERBOSE("Activities: '%s' -> '%s'\n", oldAct->name, newAct->name);
 
     // 1. willDeactivate (old)
     enqueueOps(oldAct->willDeactivateOps, oldAct->willDeactivateOps_count);
@@ -501,11 +501,12 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
                 // Correct protocol?
                 if (bir->protocol != protocol)
                     break;
+                if (bir->modifier && protocol != s_modifierProtocol)
+                    break;
 
                 // Correct modifier and value?
                 if ((bir->eventMask & kindMask) != 0 && 
                     bir->value == value && 
-                    bir->protocol == s_modifierProtocol && 
                     bir->modifier == s_modifierValue)
                 {
                     // Matched
@@ -646,7 +647,7 @@ static bool loadActivities()
     activitiesData   = data;
     activitiesConfig = (activitiesRoot*)(data + BPAK_HEADER_SIZE);
 
-    LOG("Activities: loaded %d device(s), %d activity(s)\n",
+    VERBOSE("Activities: loaded %d device(s), %d activity(s)\n",
         (int)activitiesConfig->devices_count,
         (int)activitiesConfig->activities_count);
     return true;
@@ -677,7 +678,7 @@ static void activateInitial()
     }
 
     enqueueOps(act->didActivateOps, act->didActivateOps_count);
-    LOG("Activities: initial activity '%s'\n", act->name);
+    VERBOSE("Activities: initial activity '%s'\n", act->name);
 }
 
 // ---- Public API ----
