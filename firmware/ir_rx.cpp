@@ -335,9 +335,9 @@ void pollIrRx()
         for (size_t i = 0; i < n; i++)
         {
             VERBOSE("%c%i %c%i\n", 
-                syms[i].level0 == 0 ? '_' : '-',
+                syms[i].level0 == 0 ? 'p' : 's',
                 syms[i].duration0, 
-                syms[i].level1 == 0 ? '_' : '-',
+                syms[i].level1 == 0 ? 'p' : 's',
                 syms[i].duration1);
         }
     }
