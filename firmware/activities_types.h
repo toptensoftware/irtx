@@ -18,6 +18,7 @@ extern "C" {
 #define OP_SET_IR_REG 9
 #define OP_SEARCH_STRING 10
 #define OP_IF_TRUE 11
+#define OP_WAIT_HTTP 12
 
 // binding_type
 #define BINDING_TYPE_IR 1
@@ -48,6 +49,7 @@ typedef struct switchActivityOp switchActivityOp;
 typedef struct setIrRegOp setIrRegOp;
 typedef struct searchStringOp searchStringOp;
 typedef struct ifTrueOp ifTrueOp;
+typedef struct waitHttpOp waitHttpOp;
 typedef struct binding binding;
 typedef struct bindingIr bindingIr;
 typedef struct bindingIrAny bindingIrAny;
@@ -187,6 +189,12 @@ struct __attribute__((packed)) ifTrueOp
 	/*    8 */	op** trueOps;
 	/*   12 */	uint32_t falseOps_count;
 	/*   16 */	op** falseOps;
+};
+
+// waitHttpOp
+struct __attribute__((packed)) waitHttpOp
+{
+	/*    0 */	op base;
 };
 
 // binding

@@ -10,6 +10,7 @@ export const opId = {
     set_ir_reg:      9,
     search_string:   10,
     if_true:         11,
+    wait_http:       12,
 };
 
 export const bindingType = {
@@ -129,6 +130,7 @@ let types = [
             case opId.set_ir_reg:      return "setIrRegOp";
             case opId.search_string:   return "searchStringOp";
             case opId.if_true:         return "ifTrueOp";
+            case opId.wait_http:       return "waitHttpOp";
         }
     },
     fields: [
@@ -236,6 +238,12 @@ let types = [
         { name: "falseOps", type: "length" },
         { name: "falseOps", type: "op**" },
     ]
+},
+
+{
+    name: "waitHttpOp",
+    baseType: "op",
+    fields: []
 },
 
 {

@@ -49,6 +49,97 @@ static struct { uint32_t protocol; uint64_t irCode; } s_irReg = {0, 0};
 static String  s_stringReg;
 static bool    s_boolReg = false;
 
+// ---- Background HTTP task ----
+// Each request is assigned a monotonically-increasing generation number.
+// Only the most-recently-started request's response is retained; older
+// in-flight requests are treated as fire-and-forget and their responses
+// discarded.  waitHttpOp polls until s_httpDoneGen == s_httpCurrentGen.
+struct HttpTaskParams
+{
+    uint32_t gen;
+    bool     isPost;
+    char*    url;
+    uint8_t* data;
+    uint32_t dataLen;
+    char*    contentType;
+    char*    contentEncoding;
+};
+
+static SemaphoreHandle_t s_httpMutex       = nullptr;
+static uint32_t          s_httpCurrentGen  = 0;  // gen of most recently started request
+static uint32_t          s_httpDoneGen     = 0;  // gen of most recently captured response
+static String            s_httpTaskResponse;
+
+static void httpTaskFn(void* param)
+{
+    HttpTaskParams* p = (HttpTaskParams*)param;
+    String response;
+    if (WiFi.status() == WL_CONNECTED)
+    {
+        HTTPClient http;
+        http.begin(p->url);
+        int code;
+        if (p->isPost)
+        {
+            if (p->contentType)     http.addHeader("Content-Type",     p->contentType);
+            if (p->contentEncoding) http.addHeader("Content-Encoding", p->contentEncoding);
+            code = http.POST(p->data, (int)p->dataLen);
+            VERBOSE("Activities: HTTP POST %s -> %d\n", p->url, code);
+        }
+        else
+        {
+            code = http.GET();
+            if (code > 0) response = http.getString();
+            VERBOSE("Activities: HTTP GET %s -> %d\n", p->url, code);
+        }
+        http.end();
+    }
+    else
+    {
+        LOG("Activities: HTTP op skipped (WiFi not connected)\n");
+    }
+
+    // Only retain the response if this is still the most recent request.
+    xSemaphoreTake(s_httpMutex, portMAX_DELAY);
+    if (p->gen == s_httpCurrentGen)
+    {
+        s_httpTaskResponse = response;
+        s_httpDoneGen      = p->gen;
+    }
+    xSemaphoreGive(s_httpMutex);
+
+    free(p->url);
+    free(p->data);
+    free(p->contentType);
+    free(p->contentEncoding);
+    free(p);
+    vTaskDelete(nullptr);
+}
+
+static void spawnHttpTask(HttpTaskParams* p)
+{
+    // Assign next generation under the mutex; any older in-flight task becomes
+    // fire-and-forget (its response will be discarded on arrival).
+    xSemaphoreTake(s_httpMutex, portMAX_DELAY);
+    p->gen = ++s_httpCurrentGen;
+    xSemaphoreGive(s_httpMutex);
+
+    if (xTaskCreate(httpTaskFn, "http_op", 4096, p, 1, nullptr) != pdPASS)
+    {
+        LOG("Activities: failed to create HTTP task\n");
+        // Roll back so waitHttpOp doesn't stall forever waiting for a task
+        // that never started.
+        xSemaphoreTake(s_httpMutex, portMAX_DELAY);
+        s_httpDoneGen = s_httpCurrentGen;
+        xSemaphoreGive(s_httpMutex);
+        free(p->url);
+        free(p->data);
+        free(p->contentType);
+        free(p->contentEncoding);
+        free(p);
+    }
+}
+
 // ---- Op ring buffer ----
 #define OP_QUEUE_SIZE 32
 static op* s_opQueue[OP_QUEUE_SIZE];
@@ -167,42 +258,33 @@ static void startSendWolOp(op* o)
 
 static void startHttpGetOp(op* o)
 {
-    // NOTE: HTTPClient.GET() blocks until the response is received.
-    // Response body is stored in s_stringReg for use by searchStringOp.
     httpGetOp* hg = (httpGetOp*)o;
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        HTTPClient http;
-        http.begin(hg->url);
-        int code = http.GET();
-        s_stringReg = (code > 0) ? http.getString() : "";
-        VERBOSE("Activities: HTTP GET %s -> %d\n", hg->url, code);
-        http.end();
-    }
-    else
-    {
-        LOG("Activities: HTTP GET skipped (WiFi not connected)\n");
-    }
+    HttpTaskParams* p = (HttpTaskParams*)calloc(1, sizeof(HttpTaskParams));
+    if (!p) { LOG("Activities: OOM for HTTP task\n"); return; }
+    p->isPost = false;
+    p->url    = strdup(hg->url);
+    if (!p->url) { free(p); LOG("Activities: OOM for HTTP task\n"); return; }
+    spawnHttpTask(p);
 }
 
 static void startHttpPostOp(op* o)
 {
-    // NOTE: HTTPClient.POST() blocks until the response is received.
     httpPostOp* hp = (httpPostOp*)o;
-    if (WiFi.status() == WL_CONNECTED)
+    HttpTaskParams* p = (HttpTaskParams*)calloc(1, sizeof(HttpTaskParams));
+    if (!p) { LOG("Activities: OOM for HTTP task\n"); return; }
+    p->isPost = true;
+    p->url    = strdup(hp->url);
+    if (!p->url) { free(p); LOG("Activities: OOM for HTTP task\n"); return; }
+    if (hp->data_count > 0 && hp->data)
     {
-        HTTPClient http;
-        http.begin(hp->url);
-        if (hp->contentType)     http.addHeader("Content-Type",     hp->contentType);
-        if (hp->contentEncoding) http.addHeader("Content-Encoding", hp->contentEncoding);
-        int code = http.POST(hp->data, hp->data_count);
-        VERBOSE("Activities: HTTP POST %s -> %d\n", hp->url, code);
-        http.end();
+        p->data = (uint8_t*)malloc(hp->data_count);
+        if (!p->data) { free(p->url); free(p); LOG("Activities: OOM for HTTP task\n"); return; }
+        memcpy(p->data, hp->data, hp->data_count);
+        p->dataLen = hp->data_count;
     }
-    else
-    {
-        LOG("Activities: HTTP POST skipped (WiFi not connected)\n");
-    }
+    if (hp->contentType)     p->contentType     = strdup(hp->contentType);
+    if (hp->contentEncoding) p->contentEncoding = strdup(hp->contentEncoding);
+    spawnHttpTask(p);
 }
 
 static void startUdpPacketOp(op* o)
@@ -271,6 +353,34 @@ static void startIfTrueOp(op* o)
         injectOpsAtHead(it->falseOps, it->falseOps_count);
 }
 
+static void startWaitHttpOp(op* o)
+{
+    // Become a timed op; pollWaitHttpOp drives completion.
+    s_currentOp = o;
+}
+
+static bool pollWaitHttpOp(op* /*o*/)
+{
+    bool done = false;
+    if (xSemaphoreTake(s_httpMutex, 0) == pdTRUE)
+    {
+        if (s_httpCurrentGen == 0)
+        {
+            // No HTTP request has ever been fired.
+            done = true;
+        }
+        else if (s_httpDoneGen == s_httpCurrentGen)
+        {
+            // The most recently started request has completed.
+            s_stringReg        = s_httpTaskResponse;
+            s_httpTaskResponse = "";
+            done = true;
+        }
+        xSemaphoreGive(s_httpMutex);
+    }
+    return done;
+}
+
 static void startCommitOp(op* o)
 {
     CommitOp* co = (CommitOp*)o;
@@ -312,33 +422,35 @@ static bool pollLedOp(op* o)
 
 static const startOpFn s_startOpTable[] = {
     nullptr,               // 0 — unused
-    startSendIrOp,         // OP_SEND_IR        = 1
-    startSendWolOp,        // OP_SEND_WOL       = 2
-    startHttpGetOp,        // OP_HTTP_GET        = 3
-    startHttpPostOp,       // OP_HTTP_POST       = 4
-    startUdpPacketOp,      // OP_UDP_PACKET      = 5
-    startDelayOp,          // OP_DELAY           = 6
-    startLedOp,            // OP_LED             = 7
-    startSwitchActivityOp, // OP_SWITCH_ACTIVITY = 8
-    startSetIrRegOp,       // OP_SET_IR_REG      = 9
-    startSearchStringOp,   // OP_SEARCH_STRING   = 10
-    startIfTrueOp,         // OP_IF_TRUE         = 11
+    startSendIrOp,         // OP_SEND_IR         = 1
+    startSendWolOp,        // OP_SEND_WOL        = 2
+    startHttpGetOp,        // OP_HTTP_GET         = 3
+    startHttpPostOp,       // OP_HTTP_POST        = 4
+    startUdpPacketOp,      // OP_UDP_PACKET       = 5
+    startDelayOp,          // OP_DELAY            = 6
+    startLedOp,            // OP_LED              = 7
+    startSwitchActivityOp, // OP_SWITCH_ACTIVITY  = 8
+    startSetIrRegOp,       // OP_SET_IR_REG       = 9
+    startSearchStringOp,   // OP_SEARCH_STRING    = 10
+    startIfTrueOp,         // OP_IF_TRUE          = 11
+    startWaitHttpOp,       // OP_WAIT_HTTP        = 12
 };
 static const uint32_t START_OP_TABLE_SIZE = sizeof(s_startOpTable) / sizeof(s_startOpTable[0]);
 
 static const pollOpFn s_pollOpTable[] = {
-    nullptr,        // 0 — unused
-    pollSendIrOp,   // OP_SEND_IR        = 1
-    nullptr,      // OP_SEND_WOL       = 2
-    nullptr,      // OP_HTTP_GET        = 3
-    nullptr,      // OP_HTTP_POST       = 4
-    nullptr,      // OP_UDP_PACKET      = 5
-    pollDelayOp,  // OP_DELAY           = 6
-    pollLedOp,    // OP_LED             = 7
-    nullptr,      // OP_SWITCH_ACTIVITY = 8
-    nullptr,      // OP_SET_IR_REG      = 9
-    nullptr,      // OP_SEARCH_STRING   = 10
-    nullptr,      // OP_IF_TRUE         = 11
+    nullptr,          // 0 — unused
+    pollSendIrOp,     // OP_SEND_IR         = 1
+    nullptr,          // OP_SEND_WOL        = 2
+    nullptr,          // OP_HTTP_GET         = 3
+    nullptr,          // OP_HTTP_POST        = 4
+    nullptr,          // OP_UDP_PACKET       = 5
+    pollDelayOp,      // OP_DELAY            = 6
+    pollLedOp,        // OP_LED              = 7
+    nullptr,          // OP_SWITCH_ACTIVITY  = 8
+    nullptr,          // OP_SET_IR_REG       = 9
+    nullptr,          // OP_SEARCH_STRING    = 10
+    nullptr,          // OP_IF_TRUE          = 11
+    pollWaitHttpOp,   // OP_WAIT_HTTP        = 12
 };
 static const uint32_t POLL_OP_TABLE_SIZE = sizeof(s_pollOpTable) / sizeof(s_pollOpTable[0]);
 
@@ -690,6 +802,7 @@ bool isActivitiesBusy()
 
 void setupActivities()
 {
+    s_httpMutex = xSemaphoreCreateMutex();
     if (loadActivities())
         activateInitial();
 }
@@ -715,6 +828,11 @@ bool reloadActivities()
     s_stringReg        = "";
     s_boolReg          = false;
     s_irReg            = {0, 0};
+
+    xSemaphoreTake(s_httpMutex, portMAX_DELAY);
+    s_httpDoneGen      = s_httpCurrentGen;  // discard any pending result
+    s_httpTaskResponse = "";
+    xSemaphoreGive(s_httpMutex);
 
     free(activitiesData);
     activitiesData   = nullptr;
