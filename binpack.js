@@ -303,7 +303,8 @@ let types = [
         { name: "eventMask",   type: "uint", default: irEventKindMask.press },  // bitmask of IrEventKind values to match (0xF = all)
         { name: "modifier",    type: "ulong" },                                 // zero for non-modified
         { name: "value",       type: "ulong" },                                 // ir code
-        { name: "minHoldTime", type: "uint", default: 0 },                      // minimum hold time in ms (0 = fire immediately)
+        { name: "minHoldTime",    type: "uint", default: 0 },                  // minimum hold time in ms (0 = fire immediately)
+        { name: "repeatInterval", type: "uint", default: 0 },                  // synthetic repeat interval in ms (0 = use natural IR repeat rate)
     ]
 },
 

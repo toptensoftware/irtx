@@ -663,6 +663,14 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
         {
             matchedAny = true;
 
+            // On press, configure synthetic repeat rate if the binding specifies one
+            if (kind == IrEventKind::Press && b->type == BINDING_TYPE_IR)
+            {
+                bindingIr* bir2 = (bindingIr*)b;
+                if (bir2->repeatInterval > 0)
+                    setIrRepeatInterval(bir2->repeatInterval);
+            }
+
             // Suppress release event
             if (kind == IrEventKind::LongPress)
                 suppressRelease();

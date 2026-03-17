@@ -57,6 +57,11 @@ static struct {
     bool     suppress_release;
 } ir_state = {};
 
+// ── Synthetic repeat state ────────────────────────────────────────────────────
+
+static int64_t s_syntheticRepeatInterval_us = 0;  // 0 = use natural IR repeat rate
+static int64_t s_lastSyntheticFire_us       = 0;
+
 // ── IR event stub ─────────────────────────────────────────────────────────────
 
 const char* nameOfEventKind(IrEventKind kind)
@@ -120,13 +125,18 @@ void onDecoded(uint32_t protocol, uint64_t data)
     if (within_window) {
         // ── Repeat ────────────────────────────────────────────────────────────
         ir_state.last_received_us = now;
-        onIrEvent(protocol, ir_state.code, IrEventKind::Repeat);
 
-        // Long press fires once, after 500 ms of continuous holding
-        if (!ir_state.long_press_fired &&
-            (now - ir_state.press_us) >= LONG_PRESS_US) {
-            ir_state.long_press_fired = true;
-            onIrEvent(protocol, ir_state.code, IrEventKind::LongPress);
+        // In synthetic repeat mode, real repeat frames just keep the key alive;
+        // the poll loop fires the Repeat events at the configured interval instead.
+        if (s_syntheticRepeatInterval_us == 0) {
+            onIrEvent(protocol, ir_state.code, IrEventKind::Repeat);
+
+            // Long press fires once, after 500 ms of continuous holding
+            if (!ir_state.long_press_fired &&
+                (now - ir_state.press_us) >= LONG_PRESS_US) {
+                ir_state.long_press_fired = true;
+                onIrEvent(protocol, ir_state.code, IrEventKind::LongPress);
+            }
         }
     } else {
         // ── Release old key (if any), then press the new one ──────────────────
@@ -223,14 +233,21 @@ void pollIrRx()
     if (IR_RX_PIN < 0)
         return;
 
-    // Synthesise a release if no same-code has arrived within the repeat window
+    // Synthesise a release if no same-code has arrived within the repeat window;
+    // otherwise fire synthetic repeats at the configured interval if set.
     if (ir_state.active) {
         int64_t now = esp_timer_get_time();
         if ((now - ir_state.last_received_us) >= PRESS_TIMEOUT_US) {
             if (!ir_state.suppress_release)
                 onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
-            ir_state.active            = false;
-            ir_state.suppress_release  = false;
+            ir_state.active              = false;
+            ir_state.suppress_release    = false;
+            s_syntheticRepeatInterval_us = 0;
+        } else if (s_syntheticRepeatInterval_us > 0) {
+            if (now - s_lastSyntheticFire_us >= s_syntheticRepeatInterval_us) {
+                s_lastSyntheticFire_us = now;
+                onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Repeat);
+            }
         }
     }
 
@@ -263,6 +280,12 @@ void pollIrRx()
     start_receive();
 }
 
+
+void setIrRepeatInterval(uint32_t ms)
+{
+    s_syntheticRepeatInterval_us = (int64_t)ms * 1000LL;
+    s_lastSyntheticFire_us       = esp_timer_get_time();
+}
 
 void suppressRelease()
 {
