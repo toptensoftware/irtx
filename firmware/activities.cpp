@@ -10,6 +10,7 @@
 #include "wifi_udp.h"
 #include "led.h"
 
+
 // ---- BPAK loader ----
 
 #define BPAK_SIGNATURE  0x4B415042u
@@ -89,13 +90,11 @@ static void httpTaskFn(void* param)
             if (p->contentType)     http.addHeader("Content-Type",     p->contentType);
             if (p->contentEncoding) http.addHeader("Content-Encoding", p->contentEncoding);
             code = http.POST(p->data, (int)p->dataLen);
-            VERBOSE("Activities: HTTP POST %s -> %d\n", p->url, code);
         }
         else
         {
             code = http.GET();
             if (code > 0) response = http.getString();
-            VERBOSE("Activities: HTTP GET %s -> %d\n", p->url, code);
         }
         http.end();
     }
@@ -128,6 +127,16 @@ static void spawnHttpTask(HttpTaskParams* p)
     xSemaphoreTake(s_httpMutex, portMAX_DELAY);
     p->gen = ++s_httpCurrentGen;
     xSemaphoreGive(s_httpMutex);
+
+    // Log it
+    if (p->isPost)
+    {
+        VERBOSE("Activities: HTTP POST #%u: %s\n", p->gen, p->url);
+    }
+    else
+    {
+        VERBOSE("Activities: HTTP GET #%u: %s\n", p->gen, p->url);
+    }
 
     if (xTaskCreate(httpTaskFn, "http_op", 4096, p, 1, nullptr) != pdPASS)
     {
@@ -663,17 +672,24 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
         {
             matchedAny = true;
 
+            //VERBOSE("Matched binding #%u\n", i);
+
             // On press, configure synthetic repeat rate if the binding specifies one
             if (kind == IrEventKind::Press && b->type == BINDING_TYPE_IR)
             {
                 bindingIr* bir2 = (bindingIr*)b;
-                if (bir2->repeatInterval > 0)
-                    setIrRepeatInterval(bir2->repeatInterval);
+                if (bir2->repeatRate > 0)
+                    setIrRepeatRate(bir2->repeatRate);
             }
 
             // Suppress release event
             if (kind == IrEventKind::LongPress)
+            {
+                s_holdProtocol = 0;
+                s_holdValue    = 0;
+                s_holdStartMs  = 0;
                 suppressRelease();
+            }
 
             // Enqueue op to set the ir code register
             setIrRegOp* sr = (setIrRegOp*)malloc(sizeof(setIrRegOp));

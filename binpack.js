@@ -304,7 +304,7 @@ let types = [
         { name: "modifier",    type: "ulong" },                                 // zero for non-modified
         { name: "value",       type: "ulong" },                                 // ir code
         { name: "minHoldTime",    type: "uint", default: 0 },                  // minimum hold time in ms (0 = fire immediately)
-        { name: "repeatInterval", type: "uint", default: 0 },                  // synthetic repeat interval in ms (0 = use natural IR repeat rate)
+        { name: "repeatRate", type: "uint", default: 0 },                  // synthetic repeat interval in ms (0 = use natural IR repeat rate)
     ]
 },
 

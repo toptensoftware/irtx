@@ -59,7 +59,7 @@ static struct {
 
 // ── Synthetic repeat state ────────────────────────────────────────────────────
 
-static int64_t s_syntheticRepeatInterval_us = 0;  // 0 = use natural IR repeat rate
+static int64_t s_syntheticRepeatRate_us = 0;  // 0 = use natural IR repeat rate
 static int64_t s_lastSyntheticFire_us       = 0;
 
 // ── IR event stub ─────────────────────────────────────────────────────────────
@@ -77,7 +77,8 @@ const char* nameOfEventKind(IrEventKind kind)
 
 void onIrEvent(uint32_t protocol_id, uint64_t code, IrEventKind kind)
 {
-    VERBOSE("IR Event %s 0x%08X/%016llX\n", nameOfEventKind(kind), protocol_id, code);
+//    if (kind != IrEventKind::Repeat)
+//        VERBOSE("IR Event %s 0x%08X/%016llX\n", nameOfEventKind(kind), protocol_id, code);
     invokeBindings(protocol_id, code, kind);
 }
 
@@ -100,8 +101,10 @@ static bool IRAM_ATTR rx_done_cb(rmt_channel_handle_t          chan,
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+bool didDecode = false;
 void onDecoded(uint32_t protocol, uint64_t data)
 {
+    didDecode = true;
     VERBOSE("IR Decoded 0x%08X/%016llX\n", protocol, data);
 
     int64_t now = esp_timer_get_time();
@@ -128,7 +131,7 @@ void onDecoded(uint32_t protocol, uint64_t data)
 
         // In synthetic repeat mode, real repeat frames just keep the key alive;
         // the poll loop fires the Repeat events at the configured interval instead.
-        if (s_syntheticRepeatInterval_us == 0) {
+        if (s_syntheticRepeatRate_us == 0) {
             onIrEvent(protocol, ir_state.code, IrEventKind::Repeat);
 
             // Long press fires once, after 500 ms of continuous holding
@@ -164,6 +167,42 @@ void onDecoded(const IrProtocol& protocol, uint64_t data)
     onDecoded(protocol.id, data);
 }
 
+// ── Pulse glitch accumulator ──────────────────────────────────────────────────
+/*
+// Short pulses (< 200 µs) are noise from the demodulated receiver.  Rather than
+// dropping them, we accumulate consecutive short pulses and emit them as one
+// combined pulse so the total duration is preserved.  E.g. three glitch pulses
+// of 45+14+33 µs become a single 92 µs space — which after jitter correction
+// (+300) gives 392 µs, matching the expected short space of ~387 µs.
+static bool     s_glitchPulse = false;
+static uint64_t s_glitchUs    = 0;
+
+static void decode_pulse(bool pulse, uint64_t us)
+{
+    if (us < 200) 
+    {
+        if (s_glitchUs == 0)
+            s_glitchPulse = pulse;  // first glitch determines the combined direction
+        s_glitchUs += us;
+        return;
+    }
+
+    // Flush any accumulated glitch as one combined pulse before processing this one
+    if (s_glitchUs > 0) 
+    {
+        int64_t adj = (int64_t)s_glitchUs + (s_glitchPulse ? -300LL : 300LL);
+        if (adj > 0)
+            ir_decode(s_glitchPulse, (int)adj);
+        s_glitchUs = 0;
+    }
+
+    // Adjust for demodulated receiver's jitter and decode
+    int64_t adj = (int64_t)us + (pulse ? -300LL : 300LL);
+    if (adj > 0)
+        ir_decode(pulse, (int)adj);
+}
+*/
+
 static void decode_pulse(bool pulse, uint64_t us)
 {
     // Adjust for demodulated receiver's jitter
@@ -176,7 +215,7 @@ static void decode_pulse(bool pulse, uint64_t us)
 static void start_receive(void)
 {
     rmt_receive_config_t cfg    = {};
-    cfg.signal_range_min_ns     = 1000U;                       // 1 µs glitch filter
+    cfg.signal_range_min_ns     = 1000U;                       // 1 µs (hardware max is ~3 µs; glitch filtering done in software)
     cfg.signal_range_max_ns     = IDLE_THRESHOLD_US * 1000U;   // 15 ms idle → done
     ESP_ERROR_CHECK(rmt_receive(rx_chan, rx_buf, sizeof(rx_buf), &cfg));
 }
@@ -242,9 +281,9 @@ void pollIrRx()
                 onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Release);
             ir_state.active              = false;
             ir_state.suppress_release    = false;
-            s_syntheticRepeatInterval_us = 0;
-        } else if (s_syntheticRepeatInterval_us > 0) {
-            if (now - s_lastSyntheticFire_us >= s_syntheticRepeatInterval_us) {
+            s_syntheticRepeatRate_us = 0;
+        } else if (s_syntheticRepeatRate_us > 0) {
+            if (now - s_lastSyntheticFire_us >= s_syntheticRepeatRate_us) {
                 s_lastSyntheticFire_us = now;
                 onIrEvent(ir_state.protocol_id, ir_state.code, IrEventKind::Repeat);
             }
@@ -255,6 +294,8 @@ void pollIrRx()
 
     rmt_rx_done_event_data_t edata;
     if (xQueueReceive(rx_queue, &edata, 0) != pdTRUE) return;
+
+    didDecode = false;
 
     // Inter-frame gap: time elapsed since we finished the last frame.
     // Measured in loop() so it includes RMT restart + scheduling latency (~1 ms),
@@ -269,11 +310,36 @@ void pollIrRx()
     size_t n = edata.num_symbols;
 
     for (size_t i = 0; i < n; i++) {
+
+        if (i + 1 < n)
+        {
+            // Glitch pulse with incorrect space in it (short space and short next pulse)
+            if (syms[i].duration1 < 40)
+            {
+                syms[i+1].duration0 += syms[i].duration0 + syms[i].duration1;
+                continue;
+            }
+        }
+
         if (syms[i].duration0 > 0)
             decode_pulse(syms[i].level0 == 0, syms[i].duration0);
+
         // duration1 == 0 on the final symbol means idle timeout fired here — skip it.
         if (syms[i].duration1 > 0)
             decode_pulse(syms[i].level1 == 0, syms[i].duration1);
+    }
+
+    if (!didDecode && n > 50)
+    {
+        VERBOSE("FAILED: IR packet: (%i)\n", n);
+        for (size_t i = 0; i < n; i++)
+        {
+            VERBOSE("%c%i %c%i\n", 
+                syms[i].level0 == 0 ? '_' : '-',
+                syms[i].duration0, 
+                syms[i].level1 == 0 ? '_' : '-',
+                syms[i].duration1);
+        }
     }
 
     last_end_us = esp_timer_get_time();
@@ -281,9 +347,9 @@ void pollIrRx()
 }
 
 
-void setIrRepeatInterval(uint32_t ms)
+void setIrRepeatRate(uint32_t ms)
 {
-    s_syntheticRepeatInterval_us = (int64_t)ms * 1000LL;
+    s_syntheticRepeatRate_us = (int64_t)ms * 1000LL;
     s_lastSyntheticFire_us       = esp_timer_get_time();
 }
 

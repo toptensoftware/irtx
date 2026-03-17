@@ -232,7 +232,7 @@ struct __attribute__((packed)) bindingIr
 	/*   24 */	uint64_t modifier;
 	/*   32 */	uint64_t value;
 	/*   40 */	uint32_t minHoldTime;
-	/*   44 */	uint32_t repeatInterval;
+	/*   44 */	uint32_t repeatRate;
 };
 static_assert(sizeof(bindingIr) == 48, "Size of bindingIr must be 48 bytes");
 

@@ -10,6 +10,7 @@
 #define PRINT(fmt, ...) printWrite(fmt, ##__VA_ARGS__)
 // Verbose log — like LOG but suppressed unless verbose mode is on. Recorded in dmesg when emitted.
 #define VERBOSE(fmt, ...) verboseWrite("[%7.3f] " fmt, millis() / 1000.0f, ##__VA_ARGS__)
+#define VERBOSE2(fmt, ...) verboseWrite(fmt, ##__VA_ARGS__)
 
 // ---- Hardware ----
 #define UDP_PORT     4210

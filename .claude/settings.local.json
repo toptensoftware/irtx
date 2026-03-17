@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(npx toptensoftware/binpack --header:firmware/activities_types.h)"
+    ]
+  }
+}
