@@ -31,6 +31,11 @@ static uint32_t      s_modifierProtocol = 0;
 static uint64_t      s_modifierValue    = 0;
 static unsigned long s_modifierExpiry   = 0;
 
+// ---- Hold time tracking ----
+static uint32_t      s_holdProtocol = 0;
+static uint64_t      s_holdValue    = 0;
+static unsigned long s_holdStartMs  = 0;
+
 // ---- Internal "commit activity" op ----
 // Used as the last item enqueued during a switch so that s_currentActivity
 // is updated only after all transition ops have executed.
@@ -597,6 +602,20 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
         s_modifierExpiry = 0;
     }
 
+    // Track hold time: record start on Press, clear on Release
+    if (kind == IrEventKind::Press)
+    {
+        s_holdProtocol = protocol;
+        s_holdValue    = value;
+        s_holdStartMs  = now;
+    }
+    else if (kind == IrEventKind::Release)
+    {
+        s_holdProtocol = 0;
+        s_holdValue    = 0;
+        s_holdStartMs  = 0;
+    }
+
     // Check bindings
     bool matchedAsModifier = false;
     bool matchedAny = false;
@@ -617,12 +636,15 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
                     break;
 
                 // Correct modifier and value?
-                if ((bir->eventMask & kindMask) != 0 && 
-                    bir->value == value && 
+                if ((bir->eventMask & kindMask) != 0 &&
+                    bir->value == value &&
                     bir->modifier == s_modifierValue)
                 {
-                    // Matched
-                    matched = true;
+                    // Check minimum hold time
+                    unsigned long held = (protocol == s_holdProtocol && value == s_holdValue)
+                                        ? (now - s_holdStartMs) : 0;
+                    if (held >= bir->minHoldTime)
+                        matched = true;
                 }
                 else if (s_modifierProtocol == 0 && bir->modifier == value)
                 {

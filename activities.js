@@ -40,16 +40,62 @@ const activitiesRoot = {
                 },
 
                 {
-                    // Volume up
+                    // Volume up x5
                     on: "PANA:0000400401000405",
-                    eventMask: 0x03,        // enable repeat
-                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=up",
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 3000,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=up?step=5",
                 },
 
                 {
-                    // Volume down
+                    // Volume down x5
                     on: "PANA:0000400401008485",
-                    eventMask: 0x03,        // enable repeat
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 3000,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down?step=5",
+                },
+
+                {
+                    // Volume up x2
+                    on: "PANA:0000400401000405",
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 1000,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=up?step=2",
+                },
+
+                {
+                    // Volume down x2
+                    on: "PANA:0000400401008485",
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 1000,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down?step=2",
+                },
+
+                {
+                    // Volume up x1 after initial delay
+                    on: "PANA:0000400401000405",
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 500,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down",
+                },
+
+                {
+                    // Volume down x1 after initial delay
+                    on: "PANA:0000400401008485",
+                    eventMask: 0x02,        // repeat only
+                    minHoldTime: 500,
+                    op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down",
+                },
+
+                {
+                    // Volume up x1
+                    on: "PANA:0000400401000405",
+                    ops: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=up",
+                },
+
+                {
+                    // Volume down x1
+                    on: "PANA:0000400401008485",
                     op: "http://10.1.1.103/YamahaExtendedControl/v1/main/setVolume?volume=down",
                 },
 

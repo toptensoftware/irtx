@@ -299,10 +299,11 @@ let types = [
     name: "bindingIr",
     baseType: "binding",
     fields: [
-        { name: "protocol",  type: "uint" },                                    // protocol name (riff)
-        { name: "eventMask", type: "uint", default: irEventKindMask.press },                      // bitmask of IrEventKind values to match (0xF = all)
-        { name: "modifier",  type: "ulong" },                                   // zero for non-modified
-        { name: "value",     type: "ulong" },                                   // ir code
+        { name: "protocol",    type: "uint" },                                  // protocol name (riff)
+        { name: "eventMask",   type: "uint", default: irEventKindMask.press },  // bitmask of IrEventKind values to match (0xF = all)
+        { name: "modifier",    type: "ulong" },                                 // zero for non-modified
+        { name: "value",       type: "ulong" },                                 // ir code
+        { name: "minHoldTime", type: "uint", default: 0 },                      // minimum hold time in ms (0 = fire immediately)
     ]
 },
 

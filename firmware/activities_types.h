@@ -28,10 +28,10 @@ extern "C" {
 #define BINDING_FLAGS_CONTINUE_ROUTING 1
 
 // ir_event_kind_mask
-#define IR_EVENT_KIND_PRESS      1
-#define IR_EVENT_KIND_REPEAT     2
-#define IR_EVENT_KIND_LONG_PRESS 4
-#define IR_EVENT_KIND_RELEASE    8
+#define IR_EVENT_KIND_MASK_PRESS 1
+#define IR_EVENT_KIND_MASK_REPEAT 2
+#define IR_EVENT_KIND_MASK_LONG_PRESS 4
+#define IR_EVENT_KIND_MASK_RELEASE 8
 
 // Forward declarations
 typedef struct activitiesRoot activitiesRoot;
@@ -64,6 +64,7 @@ struct __attribute__((packed)) activitiesRoot
 	/*   12 */	uint32_t activities_count;
 	/*   16 */	activity* activities;
 };
+static_assert(sizeof(activitiesRoot) == 20, "Size of activitiesRoot must be 20 bytes");
 
 // device
 struct __attribute__((packed)) device
@@ -74,6 +75,7 @@ struct __attribute__((packed)) device
 	/*   12 */	uint32_t offOps_count;
 	/*   16 */	op** offOps;
 };
+static_assert(sizeof(device) == 20, "Size of device must be 20 bytes");
 
 // activity
 struct __attribute__((packed)) activity
@@ -92,12 +94,14 @@ struct __attribute__((packed)) activity
 	/*   44 */	uint32_t didDectivateOps_count;
 	/*   48 */	op** didDectivateOps;
 };
+static_assert(sizeof(activity) == 52, "Size of activity must be 52 bytes");
 
 // op
 struct __attribute__((packed)) op
 {
 	/*    0 */	uint32_t op;
 };
+static_assert(sizeof(op) == 4, "Size of op must be 4 bytes");
 
 // sendIrOp
 struct __attribute__((packed)) sendIrOp
@@ -107,6 +111,7 @@ struct __attribute__((packed)) sendIrOp
 	/*    8 */	uint64_t irCode;
 	/*   16 */	uint32_t ipAddr;
 };
+static_assert(sizeof(sendIrOp) == 20, "Size of sendIrOp must be 20 bytes");
 
 // sendWolOp
 struct __attribute__((packed)) sendWolOp
@@ -115,6 +120,7 @@ struct __attribute__((packed)) sendWolOp
 	/*    4 */	uint8_t macaddr[6];
 	uint8_t _pad1[2];
 };
+static_assert(sizeof(sendWolOp) == 12, "Size of sendWolOp must be 12 bytes");
 
 // httpGetOp
 struct __attribute__((packed)) httpGetOp
@@ -122,6 +128,7 @@ struct __attribute__((packed)) httpGetOp
 	/*    0 */	op base;
 	/*    4 */	const char* url;
 };
+static_assert(sizeof(httpGetOp) == 8, "Size of httpGetOp must be 8 bytes");
 
 // httpPostOp
 struct __attribute__((packed)) httpPostOp
@@ -133,6 +140,7 @@ struct __attribute__((packed)) httpPostOp
 	/*   16 */	const char* contentType;
 	/*   20 */	const char* contentEncoding;
 };
+static_assert(sizeof(httpPostOp) == 24, "Size of httpPostOp must be 24 bytes");
 
 // udpPacketOp
 struct __attribute__((packed)) udpPacketOp
@@ -142,6 +150,7 @@ struct __attribute__((packed)) udpPacketOp
 	/*    8 */	uint32_t data_count;
 	/*   12 */	uint8_t* data;
 };
+static_assert(sizeof(udpPacketOp) == 16, "Size of udpPacketOp must be 16 bytes");
 
 // delayOp
 struct __attribute__((packed)) delayOp
@@ -149,6 +158,7 @@ struct __attribute__((packed)) delayOp
 	/*    0 */	op base;
 	/*    4 */	uint32_t duration;
 };
+static_assert(sizeof(delayOp) == 8, "Size of delayOp must be 8 bytes");
 
 // ledOp
 struct __attribute__((packed)) ledOp
@@ -158,6 +168,7 @@ struct __attribute__((packed)) ledOp
 	/*    8 */	uint32_t period;
 	/*   12 */	uint32_t duration;
 };
+static_assert(sizeof(ledOp) == 16, "Size of ledOp must be 16 bytes");
 
 // switchActivityOp
 struct __attribute__((packed)) switchActivityOp
@@ -165,6 +176,7 @@ struct __attribute__((packed)) switchActivityOp
 	/*    0 */	op base;
 	/*    4 */	uint32_t index;
 };
+static_assert(sizeof(switchActivityOp) == 8, "Size of switchActivityOp must be 8 bytes");
 
 // setIrRegOp
 struct __attribute__((packed)) setIrRegOp
@@ -173,6 +185,7 @@ struct __attribute__((packed)) setIrRegOp
 	/*    4 */	uint32_t protocol;
 	/*    8 */	uint64_t irCode;
 };
+static_assert(sizeof(setIrRegOp) == 16, "Size of setIrRegOp must be 16 bytes");
 
 // searchStringOp
 struct __attribute__((packed)) searchStringOp
@@ -180,6 +193,7 @@ struct __attribute__((packed)) searchStringOp
 	/*    0 */	op base;
 	/*    4 */	const char* matchString;
 };
+static_assert(sizeof(searchStringOp) == 8, "Size of searchStringOp must be 8 bytes");
 
 // ifTrueOp
 struct __attribute__((packed)) ifTrueOp
@@ -190,12 +204,14 @@ struct __attribute__((packed)) ifTrueOp
 	/*   12 */	uint32_t falseOps_count;
 	/*   16 */	op** falseOps;
 };
+static_assert(sizeof(ifTrueOp) == 20, "Size of ifTrueOp must be 20 bytes");
 
 // waitHttpOp
 struct __attribute__((packed)) waitHttpOp
 {
 	/*    0 */	op base;
 };
+static_assert(sizeof(waitHttpOp) == 4, "Size of waitHttpOp must be 4 bytes");
 
 // binding
 struct __attribute__((packed)) binding
@@ -205,6 +221,7 @@ struct __attribute__((packed)) binding
 	/*    8 */	uint32_t ops_count;
 	/*   12 */	op** ops;
 };
+static_assert(sizeof(binding) == 16, "Size of binding must be 16 bytes");
 
 // bindingIr
 struct __attribute__((packed)) bindingIr
@@ -214,13 +231,16 @@ struct __attribute__((packed)) bindingIr
 	/*   20 */	uint32_t eventMask;
 	/*   24 */	uint64_t modifier;
 	/*   32 */	uint64_t value;
+	/*   40 */	uint32_t minHoldTime;
 };
+static_assert(sizeof(bindingIr) == 44, "Size of bindingIr must be 44 bytes");
 
 // bindingIrAny
 struct __attribute__((packed)) bindingIrAny
 {
 	/*    0 */	binding base;
 };
+static_assert(sizeof(bindingIrAny) == 16, "Size of bindingIrAny must be 16 bytes");
 
 #ifdef __cplusplus
 }
