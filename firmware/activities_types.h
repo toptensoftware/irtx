@@ -70,10 +70,10 @@ static_assert(sizeof(activitiesRoot) == 20, "Size of activitiesRoot must be 20 b
 struct __attribute__((packed)) device
 {
 	/*    0 */	const char* name;
-	/*    4 */	uint32_t onOps_count;
-	/*    8 */	op** onOps;
-	/*   12 */	uint32_t offOps_count;
-	/*   16 */	op** offOps;
+	/*    4 */	uint32_t turnOn_count;
+	/*    8 */	op** turnOn;
+	/*   12 */	uint32_t turnOff_count;
+	/*   16 */	op** turnOff;
 };
 static_assert(sizeof(device) == 20, "Size of device must be 20 bytes");
 
@@ -85,14 +85,14 @@ struct __attribute__((packed)) activity
 	/*    8 */	int32_t* devices;
 	/*   12 */	uint32_t bindings_count;
 	/*   16 */	binding** bindings;
-	/*   20 */	uint32_t willActivateOps_count;
-	/*   24 */	op** willActivateOps;
-	/*   28 */	uint32_t didActivateOps_count;
-	/*   32 */	op** didActivateOps;
-	/*   36 */	uint32_t willDeactivateOps_count;
-	/*   40 */	op** willDeactivateOps;
-	/*   44 */	uint32_t didDectivateOps_count;
-	/*   48 */	op** didDectivateOps;
+	/*   20 */	uint32_t willActivate_count;
+	/*   24 */	op** willActivate;
+	/*   28 */	uint32_t didActivate_count;
+	/*   32 */	op** didActivate;
+	/*   36 */	uint32_t willDeactivate_count;
+	/*   40 */	op** willDeactivate;
+	/*   44 */	uint32_t didDeactivate_count;
+	/*   48 */	op** didDeactivate;
 };
 static_assert(sizeof(activity) == 52, "Size of activity must be 52 bytes");
 
@@ -218,8 +218,8 @@ struct __attribute__((packed)) binding
 {
 	/*    0 */	uint32_t type;
 	/*    4 */	uint32_t flags;
-	/*    8 */	uint32_t ops_count;
-	/*   12 */	op** ops;
+	/*    8 */	uint32_t doOps_count;
+	/*   12 */	op** doOps;
 };
 static_assert(sizeof(binding) == 16, "Size of binding must be 16 bytes");
 

@@ -512,6 +512,15 @@ static bool deviceInActivity(const activity* act, int32_t devIdx)
     return false;
 }
 
+static void clearModifier()
+{
+    // Clear modifier
+    s_modifierProtocol = 0;
+    s_modifierValue = 0;
+    s_modifierExpiry = 0;
+    VERBOSE("Modifier cleared!");
+}
+
 // ---- Switch activity ----
 void switchActivity(int newIndex)
 {
@@ -539,10 +548,10 @@ void switchActivity(int newIndex)
     VERBOSE("Activities: '%s' -> '%s'\n", oldAct->name, newAct->name);
 
     // 1. willDeactivate (old)
-    enqueueOps(oldAct->willDeactivateOps, oldAct->willDeactivateOps_count);
+    enqueueOps(oldAct->willDeactivate, oldAct->willDeactivate_count);
 
     // 2. willActivate (new)
-    enqueueOps(newAct->willActivateOps, newAct->willActivateOps_count);
+    enqueueOps(newAct->willActivate, newAct->willActivate_count);
 
     // 3. Turn on devices new activity needs that are not already on.
     //    Null device list = this activity doesn't manage devices.
@@ -556,8 +565,8 @@ void switchActivity(int newIndex)
                 continue;
             if (!(s_deviceOnMask & (1u << devIdx)))
             {
-                enqueueOps(activitiesConfig->devices[devIdx].onOps,
-                           activitiesConfig->devices[devIdx].onOps_count);
+                enqueueOps(activitiesConfig->devices[devIdx].turnOn,
+                           activitiesConfig->devices[devIdx].turnOn_count);
                 s_deviceOnMask |= (1u << devIdx);
             }
         }
@@ -574,18 +583,18 @@ void switchActivity(int newIndex)
                 continue;
             if (!deviceInActivity(newAct, devIdx) && (s_deviceOnMask & (1u << devIdx)))
             {
-                enqueueOps(activitiesConfig->devices[devIdx].offOps,
-                           activitiesConfig->devices[devIdx].offOps_count);
+                enqueueOps(activitiesConfig->devices[devIdx].turnOff,
+                           activitiesConfig->devices[devIdx].turnOff_count);
                 s_deviceOnMask &= ~(1u << devIdx);
             }
         }
     }
 
     // 5. didActivate (new)
-    enqueueOps(newAct->didActivateOps, newAct->didActivateOps_count);
+    enqueueOps(newAct->didActivate, newAct->didActivate_count);
 
     // 6. didDeactivate (old)
-    enqueueOps(oldAct->didDectivateOps, oldAct->didDectivateOps_count);
+    enqueueOps(oldAct->didDeactivate, oldAct->didDeactivate_count);
 
     // 7. Commit: s_currentActivity updated once all transition ops have run.
     s_commitOp.base.op = OP_INTERNAL_COMMIT;
@@ -606,9 +615,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
     // Reset modifier if timed out
     if (s_modifierProtocol != 0 && now > s_modifierExpiry)
     {
-        s_modifierProtocol = 0;
-        s_modifierValue = 0;
-        s_modifierExpiry = 0;
+        clearModifier();
     }
 
     // Track hold time: record start on Press, clear on Release
@@ -638,16 +645,13 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
             {
                 bindingIr* bir = (bindingIr*)b;
 
-                // Correct protocol?
-                if (bir->protocol != protocol)
-                    break;
-                if (bir->modifier && protocol != s_modifierProtocol)
-                    break;
-
                 // Correct modifier and value?
-                if ((bir->eventMask & kindMask) != 0 &&
+                if (bir->protocol == protocol &&
                     bir->value == value &&
-                    bir->modifier == s_modifierValue)
+                    (bir->eventMask & kindMask) != 0 &&
+                    ((bir->modifier == 0 && s_modifierProtocol == 0) || 
+                     (bir->modifier == s_modifierValue && bir->protocol == s_modifierProtocol))
+                    )
                 {
                     // Check minimum hold time
                     unsigned long held = (protocol == s_holdProtocol && value == s_holdValue)
@@ -655,7 +659,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
                     if (held >= bir->minHoldTime)
                         matched = true;
                 }
-                else if (s_modifierProtocol == 0 && bir->modifier == value)
+                else if (s_modifierProtocol == 0 && bir->protocol == protocol && bir->modifier == value)
                 {
                     // Modifier
                     matchedAsModifier = true;
@@ -672,7 +676,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
         {
             matchedAny = true;
 
-            //VERBOSE("Matched binding #%u\n", i);
+            VERBOSE("Matched binding #%u\n", i);
 
             // On press, configure synthetic repeat rate if the binding specifies one
             if (kind == IrEventKind::Press && b->type == BINDING_TYPE_IR)
@@ -704,7 +708,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
             enqueueOp((op*)sr);
 
             // Enqueue the binding's operations
-            enqueueOps(b->ops, b->ops_count);
+            enqueueOps(b->doOps, b->doOps_count);
 
             // Quit routing?
             if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING))
@@ -715,10 +719,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
     // Update modifier state
     if (matchedAny)
     {
-        // Clear modifier
-        s_modifierProtocol = 0;
-        s_modifierValue = 0;
-        s_modifierExpiry = 0;
+        clearModifier();
     }
     else if (matchedAsModifier)
     {
@@ -726,6 +727,7 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
         s_modifierProtocol = protocol;
         s_modifierValue = value;
         s_modifierExpiry = now + MODIFIER_TIMEOUT_MS;
+        VERBOSE("Modifier active!\n");
     }
 }
 
@@ -819,7 +821,7 @@ static void activateInitial()
     s_currentActivity = 0;
     activity* act = &activitiesConfig->activities[0];
 
-    enqueueOps(act->willActivateOps, act->willActivateOps_count);
+    enqueueOps(act->willActivate, act->willActivate_count);
 
     if (act->devices != nullptr)
     {
@@ -829,13 +831,13 @@ static void activateInitial()
             if (devIdx < 0 || devIdx >= MAX_ACTIVITIES_DEVICES ||
                 (uint32_t)devIdx >= activitiesConfig->devices_count)
                 continue;
-            enqueueOps(activitiesConfig->devices[devIdx].onOps,
-                       activitiesConfig->devices[devIdx].onOps_count);
+            enqueueOps(activitiesConfig->devices[devIdx].turnOn,
+                       activitiesConfig->devices[devIdx].turnOn_count);
             s_deviceOnMask |= (1u << devIdx);
         }
     }
 
-    enqueueOps(act->didActivateOps, act->didActivateOps_count);
+    enqueueOps(act->didActivate, act->didActivate_count);
     VERBOSE("Activities: initial activity '%s'\n", act->name);
 }
 
@@ -897,8 +899,7 @@ void pollActivities()
     // Expire a pending modifier key.
     if (s_modifierProtocol != 0 && millis() >= s_modifierExpiry)
     {
-        VERBOSE("Activities: modifier key expired\n");
-        s_modifierProtocol = 0;
+        clearModifier();
     }
 
     // Poll the currently-running timed op (delay, LED, …).

@@ -12,7 +12,7 @@ hooks. Only one activity is active at a time.
 ### Key concepts
 
 **Devices** are external pieces of equipment (TV, receiver, etc.). Each device
-has an `onOps` and `offOps` sequence. When switching activities the firmware
+has an `turnOn` and `turnOff` sequence. When switching activities the firmware
 automatically powers devices on or off as needed, based on which devices the
 old and new activities reference.
 

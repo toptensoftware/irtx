@@ -29,8 +29,6 @@ export const irEventKindMask = {
     release:    8,
 };
 
-
-
 /**
  * Encodes a 4-character ASCII string as a little-endian 32-bit RIFF FourCC integer.
  * @param {string} a - A string of up to 4 characters (padded with spaces if shorter).
@@ -48,7 +46,91 @@ export function riff(a)
             (a.charCodeAt(2) << 16) |
             (a.charCodeAt(3) << 24);
     }
+
+    if (typeof(a) === "number")
+        return a;
+
     throw new Error("Invalid riff value");
+}
+
+/**
+ * Parses an IPv4 address into a 32-bit value
+ * @param {string} ip the ip address to parse
+ * @returns {Number} packed ip address
+ */
+export function parseIPv4(ip) {
+    if (typeof ip == "string")
+        return ip.split('.').reverse().reduce((acc, octet) => (acc << 8) | parseInt(octet, 10), 0) >>> 0;
+    else
+        return ip;
+}
+
+/**
+ * 
+ * @param {String} macaddr the mac address to parse 
+ * @returns {Number[]} mac address as 6 integers
+ */
+export function parseMacAddress(ip) {
+    if (typeof ip == "string")
+    {
+        let parts = ip.split(':');
+        if (parts.length != 6)
+            throw new Error("Invalid mac address - should have 6 parts");
+
+        return parts.map(x => parseInt("0x" + x));
+    }
+    else
+        return ip;
+}
+
+export class op
+{
+    static switchActivity(nameOrIndex)
+    {
+        return { 
+            op: opId.switch_activity,
+            index: nameOrIndex,
+        }
+    }
+
+    static httpGet(url)
+    {
+        return {
+            op: opId.http_get,
+            url,
+        }
+    }
+
+    static sendWol(macaddr)
+    {
+        return {
+            op: opId.send_wol,
+            macaddr: parseMacAddress(macaddr)
+        }
+    }
+
+    static sendIr(irCode, ipAddr = 0)
+    {
+        let m = irCode.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
+        if (!m)
+            throw new Error("Invalid irCode");
+
+        return {
+            op: opId.send_ir,
+            protocol: riff(m[1]),
+            irCode: BigInt("0x" + m[2]),
+            ipAddr: parseIPv4(ipAddr),
+        }
+    }
+}
+
+function makeArray(value)
+{
+    if (value == null || value == undefined)
+        return value;
+    if (Array.isArray(value))
+        return value;
+    return [ value ];
 }
 
 
@@ -72,31 +154,57 @@ let types = [
 
 {
     name: "device",
+    packMapper: (value) =>
+    {
+        value.turnOn = makeArray(value.turnOn);
+        value.turnOff = makeArray(value.turnOff);
+        return value;
+    },
     fields: [
         { name: "name", type: "string" },
-        { name: "onOps", type: "length" },
-        { name: "onOps", type: "op**" },
-        { name: "offOps", type: "length" },
-        { name: "offOps", type: "op**" },
+        { name: "turnOn", type: "length" },
+        { name: "turnOn", type: "op**", default: [] },
+        { name: "turnOff", type: "length" },
+        { name: "turnOff", type: "op**", default: [] },
     ]
 },
 
 {
     name: "activity",
+    packMapper: (value, root) => {
+        if (Array.isArray(value.devices))
+        {
+            value.devices = value.devices.map((name) => {
+                if (typeof name == 'string')
+                {
+                    let index = root.devices.findIndex(x => x.name == name);
+                    if (index < 0)
+                        throw new Error(`Unknown device ${name}`);
+                    return index;
+                }
+                return name;
+            });
+        }
+        value.willActivate = makeArray(value.willActivate);
+        value.willDeactivate = makeArray(value.willDeactivate);
+        value.didActivate = makeArray(value.didActivate);
+        value.didDeactivate = makeArray(value.didDeactivate);
+        return value;
+    },
     fields: [
         { name: "name", type: "string" },
         { name: "devices", type: "length" },
         { name: "devices", type: "int*" },
         { name: "bindings", type: "length" },
         { name: "bindings", type: "binding**", default: [] },
-        { name: "willActivateOps", type: "length" },
-        { name: "willActivateOps", type: "op**", default: [] },
-        { name: "didActivateOps", type: "length" },
-        { name: "didActivateOps", type: "op**", default: [] },
-        { name: "willDeactivateOps", type: "length" },
-        { name: "willDeactivateOps", type: "op**", default: [] },
-        { name: "didDectivateOps", type: "length" },
-        { name: "didDectivateOps", type: "op**", default: [] },
+        { name: "willActivate", type: "length" },
+        { name: "willActivate", type: "op**", default: [] },
+        { name: "didActivate", type: "length" },
+        { name: "didActivate", type: "op**", default: [] },
+        { name: "willDeactivate", type: "length" },
+        { name: "willDeactivate", type: "op**", default: [] },
+        { name: "didDeactivate", type: "length" },
+        { name: "didDeactivate", type: "op**", default: [] },
     ]
 },
 
@@ -142,9 +250,9 @@ let types = [
     name: "sendIrOp",
     baseType: "op",
     fields: [
-        { name: "protocol", type: "uint" },
+        { name: "protocol", type: "uint", packMapper: riff },
         { name: "irCode", type: "ulong" },
-        { name: "ipAddr", type: "uint", default: 0 },
+        { name: "ipAddr", type: "uint", default: 0, packMapper: parseIPv4 },
     ]
 },
 
@@ -207,6 +315,17 @@ let types = [
 {
     name: "switchActivityOp",
     baseType: "op",
+    packMapper: (value, root) => 
+    {
+        if (typeof value.index === 'string')
+        {
+            let name = value.index;
+            value.index = root.activities.findIndex(x => x.name == value.index);
+            if (value.index < 0)
+                throw new Error(`Unknown activity ${name}`);
+        }
+        return value;
+    },
     fields: [
         { name: "index", type: "uint" },
     ]
@@ -216,7 +335,7 @@ let types = [
     name: "setIrRegOp",
     baseType: "op",
     fields: [
-        { name: "protocol", type: "uint" },
+        { name: "protocol", type: "uint", packMapper: riff },
         { name: "irCode",   type: "ulong" },
     ]
 },
@@ -265,19 +384,25 @@ let types = [
                 let m = value.on.match(/^([A-Z0-9]+):(?:0x)?(?:([a-fA-F0-9]+)\+)?(?:0x)?([a-fA-F0-9]+)?/);
                 value.type = bindingType.ir;
                 value.protocol = riff(m[1]);
-                value.modifier = m[2] ? BigInt("0x" + m[2]) : 0n;
+                if (m[2])
+                    value.modifier = BigInt("0x" + m[2]);
                 value.value = BigInt("0x" + m[3]);
             }
 
             delete value.on;
         }
-        if (value.op)
+
+        // Crack protocol:ircode modifier from string
+        if (typeof value.modifier === 'string')
         {
-            value.ops = [ value.op ];
-            delete value.op;
+            let m = value.modifier.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
+            let modifierProtocol = riff(m[1]);
+            if (value.protocol && value.protocol != modifierProtocol)
+                throw new Error(`Modifier has mismatched protocol ${value.protocol} != ${modifierProtocol}`);
+            value.modifier = BigInt("0x" + m[2]);
         }
-        if (!Array.isArray(value.ops))
-            value.ops = [ value.ops ];
+
+        value.do = makeArray(value.do);
         return value;
     },
     resolveVirtualType: (val) => {
@@ -290,8 +415,8 @@ let types = [
     fields: [
         { name: "type", type: "uint" },
         { name: "flags", type: "uint", default: 0 },
-        { name: "ops", type: "length" },
-        { name: "ops", type: "op**" },       // Ops to execute
+        { name: "do", type: "length", cname: "doOps_count" },
+        { name: "do", type: "op**", cname: "doOps" },       // Ops to execute
     ]
 },
 
@@ -299,12 +424,12 @@ let types = [
     name: "bindingIr",
     baseType: "binding",
     fields: [
-        { name: "protocol",    type: "uint" },                                  // protocol name (riff)
+        { name: "protocol",    type: "uint", packMapper: riff },                // protocol name (riff)
         { name: "eventMask",   type: "uint", default: irEventKindMask.press },  // bitmask of IrEventKind values to match (0xF = all)
-        { name: "modifier",    type: "ulong" },                                 // zero for non-modified
+        { name: "modifier",    type: "ulong", default: 0 },                                 // zero for non-modified
         { name: "value",       type: "ulong" },                                 // ir code
-        { name: "minHoldTime",    type: "uint", default: 0 },                  // minimum hold time in ms (0 = fire immediately)
-        { name: "repeatRate", type: "uint", default: 0 },                  // synthetic repeat interval in ms (0 = use natural IR repeat rate)
+        { name: "minHoldTime", type: "uint", default: 0 },                   // minimum hold time in ms (0 = fire immediately)
+        { name: "repeatRate",  type: "uint", default: 0 },                       // synthetic repeat interval in ms (0 = use natural IR repeat rate)
     ]
 },
 
