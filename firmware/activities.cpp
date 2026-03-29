@@ -669,10 +669,17 @@ void invokeGpioBindings(int pin, bool pressed)
     }
     else
     {
-        s_gpioHoldPin    = -1;
-        s_gpioRepeatRate = 0;
+        // Only stop repeat tracking if this is the currently tracked (last-pressed) pin.
+        // Releasing an earlier pin must not disturb repeat for the pin still held.
+        unsigned long held = 0;
+        if (pin == s_gpioHoldPin)
+        {
+            held             = now - s_gpioPressStartMs;
+            s_gpioHoldPin    = -1;
+            s_gpioRepeatRate = 0;
+        }
 
-        fireGpioEvent(pin, IR_EVENT_KIND_MASK_RELEASE, now - s_gpioPressStartMs);
+        fireGpioEvent(pin, IR_EVENT_KIND_MASK_RELEASE, held);
     }
 }
 
