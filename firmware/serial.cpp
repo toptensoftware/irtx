@@ -140,7 +140,7 @@ void handleCommand(const char* line)
         int pinA = (int)strtol(p, &end, 10);
         if (end == p)
         {
-            PRINT("Usage: gpio [<pin> [<pin>] <rgb|irrx|irtx|pullup|pulldown>]\n");
+            PRINT("Usage: gpio [<pin> [<pin>] <grb|rgb|irrx|irtx|pullup|pulldown>]\n");
             return;
         }
         p = end;
@@ -159,7 +159,7 @@ void handleCommand(const char* line)
 
         if (*p == '\0')
         {
-            PRINT("Usage: gpio [<pin> [<pin>] <rgb|irrx|irtx|pullup|pulldown>]\n");
+            PRINT("Usage: gpio [<pin> [<pin>] <grb|rgb|irrx|irtx|pullup|pulldown>]\n");
             return;
         }
 

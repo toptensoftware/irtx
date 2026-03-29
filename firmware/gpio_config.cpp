@@ -5,6 +5,7 @@
 int         gpioIrTxPin    = -1;
 int         gpioIrRxPin    = -1;
 int         gpioLedPin     = -1;
+int         gpioLedOrder   = GPIO_LED_ORDER_GRB;
 GpioPinSlot gpioPullupSlots[MAX_GPIO_PULL_PINS]   = {};
 uint8_t     gpioPullupCount  = 0;
 GpioPinSlot gpioPulldownSlots[MAX_GPIO_PULL_PINS] = {};
@@ -46,9 +47,10 @@ static void saveToNvs()
 {
     extern Preferences prefs;
     prefs.begin("gpio", false);
-    prefs.putInt("irtx", gpioIrTxPin);
-    prefs.putInt("irrx", gpioIrRxPin);
-    prefs.putInt("led",  gpioLedPin);
+    prefs.putInt("irtx",     gpioIrTxPin);
+    prefs.putInt("irrx",     gpioIrRxPin);
+    prefs.putInt("led",      gpioLedPin);
+    prefs.putInt("ledorder", gpioLedOrder);
     prefs.putBytes("pullup",   gpioPullupSlots,   gpioPullupCount   * sizeof(GpioPinSlot));
     prefs.putBytes("pulldown", gpioPulldownSlots, gpioPulldownCount * sizeof(GpioPinSlot));
     prefs.end();
@@ -70,9 +72,10 @@ void setupGpioConfig()
 {
     extern Preferences prefs;
     prefs.begin("gpio", true);
-    gpioIrTxPin = prefs.getInt("irtx", -1);
-    gpioIrRxPin = prefs.getInt("irrx", -1);
-    gpioLedPin  = prefs.getInt("led",  -1);
+    gpioIrTxPin  = prefs.getInt("irtx",     -1);
+    gpioIrRxPin  = prefs.getInt("irrx",     -1);
+    gpioLedPin   = prefs.getInt("led",      -1);
+    gpioLedOrder = prefs.getInt("ledorder", GPIO_LED_ORDER_GRB);
     size_t upBytes   = prefs.getBytes("pullup",   gpioPullupSlots,
                                       MAX_GPIO_PULL_PINS * sizeof(GpioPinSlot));
     size_t downBytes = prefs.getBytes("pulldown", gpioPulldownSlots,
@@ -106,7 +109,9 @@ void statusGpioConfig()
 {
     PRINT("IR TX pin: %d\n", gpioIrTxPin);
     PRINT("IR RX pin: %d\n", gpioIrRxPin);
-    PRINT("LED pin:   %d\n", gpioLedPin);
+    PRINT("LED pin:   %d (%s)\n", gpioLedPin,
+          gpioLedPin < 0 ? "disabled" :
+          gpioLedOrder == GPIO_LED_ORDER_GRB ? "grb" : "rgb");
 
     PRINT("Pullup slots (%d):", gpioPullupCount);
     printSlots(gpioPullupSlots, gpioPullupCount);
@@ -129,9 +134,15 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     if (pinB >= 0)
         removePinFromAllRoles(pinB);
 
-    if (strcmp(func, "rgb") == 0)
+    if (strcmp(func, "grb") == 0)
     {
-        gpioLedPin = pinA;
+        gpioLedPin   = pinA;
+        gpioLedOrder = GPIO_LED_ORDER_GRB;
+    }
+    else if (strcmp(func, "rgb") == 0)
+    {
+        gpioLedPin   = pinA;
+        gpioLedOrder = GPIO_LED_ORDER_RGB;
     }
     else if (strcmp(func, "irtx") == 0)
     {
@@ -163,7 +174,7 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     }
     else
     {
-        PRINT("Unknown function '%s' — use: rgb, irrx, irtx, pullup, pulldown\n", func);
+        PRINT("Unknown function '%s' — use: grb, rgb, irrx, irtx, pullup, pulldown\n", func);
         return;
     }
 
