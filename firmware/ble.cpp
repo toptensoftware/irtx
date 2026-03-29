@@ -13,14 +13,11 @@
 #define MAX_BLE_DEVICES     4
 
 /*
-Needs patched NimBLE library.
+Needs PR branch NimBLE library.
 
-C:\Users\YOURUSERNAME\Documents\Arduino\libraries\NimBLE-Arduino\src\nimble\nimble\host\store\config\src\ble_store_nvs.c
-
-//#define NIMBLE_NVS_NAMESPACE                     "nimble_bond"
-const char* NIMBLE_NVS_NAMESPACE = "nimble_bond";
+$ arduino-cli config set library.enable_unsafe_install true
+$ arduino-cli lib install --git-url https://github.com/h2zero/NimBLE-Arduino#nvs-custom-namespace
 */
-extern const char* NIMBLE_NVS_NAMESPACE;
 
 // BLE server
 NimBLEServer*         bleServer      = nullptr;
@@ -254,7 +251,9 @@ void startServer(int slot)
 
     sprintf(slotName, "%s-%i", deviceName, slot);
     sprintf(nvsName, "nimble_bond_%i", slot);
-    NIMBLE_NVS_NAMESPACE = nvsName;
+//    NIMBLE_NVS_NAMESPACE = nvsName;
+//    set_nvs_namespace(nvsName);
+    set_nimble_nvs_namespace(nvsName);
 
     LOG("BLE starting (%s)...\n", slotName);
 
