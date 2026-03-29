@@ -16,6 +16,7 @@ export const opId = {
 export const bindingType = {
     ir:     1,
     ir_any: 2,
+    gpio:   3,
 };
 
 export const bindingFlags = {
@@ -378,6 +379,12 @@ let types = [
                 // Any IR Code
                 value = { type: bindingType.ir_any , ...value };
             }
+            else if (value.on.startsWith("gpio:"))
+            {
+                // gpio:<pin>
+                value.type = bindingType.gpio;
+                value.pin = parseInt(value.on.slice(5));
+            }
             else
             {
                 // <protocol>:<modifier>+<ircode>
@@ -410,6 +417,7 @@ let types = [
         {
             case bindingType.ir:     return "bindingIr";
             case bindingType.ir_any: return "bindingIrAny";
+            case bindingType.gpio:   return "bindingGpio";
         }
     },
     fields: [
@@ -437,6 +445,18 @@ let types = [
     name: "bindingIrAny",
     baseType: "binding",
     fields: []                                          // matches any received IR code
+},
+
+{
+    name: "bindingGpio",
+    baseType: "binding",
+    fields: [
+        { name: "pin",          type: "uint" },                                              // GPIO pin number
+        { name: "eventMask",    type: "uint", default: irEventKindMask.press },              // press=1, repeat=2, release=8
+        { name: "minHoldTime",  type: "uint", default: 0 },                                  // ms held before event fires (0 = immediate)
+        { name: "initialDelay", type: "uint", default: 0 },                                  // ms after press before first repeat (0 = use repeatRate)
+        { name: "repeatRate",   type: "uint", default: 0 },                                  // repeat interval in ms (0 = no repeat)
+    ]
 },
 
 ];
