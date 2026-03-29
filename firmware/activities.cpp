@@ -689,6 +689,40 @@ void onButton(int pin, bool pressed)
     invokeGpioBindings(pin, pressed);
 }
 
+// ---- Encoder binding helpers ----
+
+// Scan the current activity for encoder bindings matching pin, direction, and velocity.
+// Bindings are ordered by minVelocityPeriod descending (slow-only first, catch-all last)
+// so earlier matches abort routing before less-specific ones fire — mirroring how button
+// minHoldTime works (long-press bindings before short-press ones).
+void invokeEncoderBindings(int pin, int direction, uint32_t velocity)
+{
+    if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
+    activity* act = &activitiesConfig->activities[s_currentActivity];
+
+    for (uint32_t i = 0; i < act->bindings_count; i++)
+    {
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_GPIO_ENCODER) continue;
+
+        bindingGpioEncoder* be = (bindingGpioEncoder*)b;
+        if ((int)be->pin != pin)                          continue;
+        if (be->direction != 0 && be->direction != direction) continue;
+        if (velocity < be->minVelocityPeriod)             continue;
+
+        VERBOSE("Encoder binding #%u matched pin=%d dir=%d\n", i, pin, direction);
+        enqueueOps(b->doOps, b->doOps_count);
+
+        if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING)) break;
+    }
+}
+
+// Non-weak override: routes onEncoder() from gpio_config.cpp into activities.
+void onEncoder(int pin, int direction, uint32_t velocity)
+{
+    invokeEncoderBindings(pin, direction, velocity);
+}
+
 // ---- Binding matcher (called from IR RX on every decoded code) ----
 void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
 {
