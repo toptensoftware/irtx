@@ -148,6 +148,9 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     if (pinB >= 0)
         removePinFromAllRoles(pinB);
 
+    if (strcmp(func, "none") == 0)
+    {
+    }
     if (strcmp(func, "grb") == 0)
     {
         gpioLedPin   = pinA;
