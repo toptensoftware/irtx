@@ -12,6 +12,7 @@ struct GpioPinSlot {
 
 extern int          gpioIrTxPin;
 extern int          gpioIrRxPin;
+extern int          gpioLedPin;
 extern GpioPinSlot  gpioPullupSlots[MAX_GPIO_PULL_PINS];
 extern uint8_t      gpioPullupCount;
 extern GpioPinSlot  gpioPulldownSlots[MAX_GPIO_PULL_PINS];

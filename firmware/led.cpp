@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "config.h"
+#include "gpio_config.h"
 
 
 static uint32_t colors[] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, };
@@ -46,10 +47,13 @@ void setLed(int priority, uint32_t color)
         if (color == 0xFFFFFFFF)
             color = 0;
 
-    #ifdef CONFIG_IDF_TARGET_ESP32C6
-        neopixelWrite(LED_PIN, (color >> 8) & 0xFF, (color >> 16) & 0xFF, color & 0xFF);
-    #else
-        neopixelWrite(LED_PIN, (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
-    #endif
+        if (gpioLedPin >= 0)
+        {
+        #ifdef CONFIG_IDF_TARGET_ESP32C6
+            neopixelWrite(gpioLedPin, (color >> 8) & 0xFF, (color >> 16) & 0xFF, color & 0xFF);
+        #else
+            neopixelWrite(gpioLedPin, (color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
+        #endif
+        }
     }
 }

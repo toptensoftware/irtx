@@ -4,6 +4,7 @@
 
 int         gpioIrTxPin    = -1;
 int         gpioIrRxPin    = -1;
+int         gpioLedPin     = -1;
 GpioPinSlot gpioPullupSlots[MAX_GPIO_PULL_PINS]   = {};
 uint8_t     gpioPullupCount  = 0;
 GpioPinSlot gpioPulldownSlots[MAX_GPIO_PULL_PINS] = {};
@@ -15,6 +16,7 @@ static void removePinFromAllRoles(int pin)
 {
     if (gpioIrTxPin == pin) gpioIrTxPin = -1;
     if (gpioIrRxPin == pin) gpioIrRxPin = -1;
+    if (gpioLedPin  == pin) gpioLedPin  = -1;
 
     for (int i = 0; i < gpioPullupCount; i++)
     {
@@ -46,6 +48,7 @@ static void saveToNvs()
     prefs.begin("gpio", false);
     prefs.putInt("irtx", gpioIrTxPin);
     prefs.putInt("irrx", gpioIrRxPin);
+    prefs.putInt("led",  gpioLedPin);
     prefs.putBytes("pullup",   gpioPullupSlots,   gpioPullupCount   * sizeof(GpioPinSlot));
     prefs.putBytes("pulldown", gpioPulldownSlots, gpioPulldownCount * sizeof(GpioPinSlot));
     prefs.end();
@@ -69,6 +72,7 @@ void setupGpioConfig()
     prefs.begin("gpio", true);
     gpioIrTxPin = prefs.getInt("irtx", -1);
     gpioIrRxPin = prefs.getInt("irrx", -1);
+    gpioLedPin  = prefs.getInt("led",  -1);
     size_t upBytes   = prefs.getBytes("pullup",   gpioPullupSlots,
                                       MAX_GPIO_PULL_PINS * sizeof(GpioPinSlot));
     size_t downBytes = prefs.getBytes("pulldown", gpioPulldownSlots,
@@ -82,8 +86,8 @@ void setupGpioConfig()
     applyPullModes(gpioPulldownSlots, gpioPulldownCount, INPUT_PULLDOWN);
     initPollState();
 
-    LOG("GPIO config: irtx=%d irrx=%d pullup=%d pulldown=%d\n",
-        gpioIrTxPin, gpioIrRxPin, gpioPullupCount, gpioPulldownCount);
+    LOG("GPIO config: irtx=%d irrx=%d led=%d pullup=%d pulldown=%d\n",
+        gpioIrTxPin, gpioIrRxPin, gpioLedPin, gpioPullupCount, gpioPulldownCount);
 }
 
 static void printSlots(GpioPinSlot* slots, uint8_t count)
@@ -102,6 +106,7 @@ void statusGpioConfig()
 {
     PRINT("IR TX pin: %d\n", gpioIrTxPin);
     PRINT("IR RX pin: %d\n", gpioIrRxPin);
+    PRINT("LED pin:   %d\n", gpioLedPin);
 
     PRINT("Pullup slots (%d):", gpioPullupCount);
     printSlots(gpioPullupSlots, gpioPullupCount);
@@ -124,7 +129,11 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     if (pinB >= 0)
         removePinFromAllRoles(pinB);
 
-    if (strcmp(func, "irtx") == 0)
+    if (strcmp(func, "rgb") == 0)
+    {
+        gpioLedPin = pinA;
+    }
+    else if (strcmp(func, "irtx") == 0)
     {
         gpioIrTxPin = pinA;
     }
@@ -154,7 +163,7 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     }
     else
     {
-        PRINT("Unknown function '%s' — use: irrx, irtx, pullup, pulldown\n", func);
+        PRINT("Unknown function '%s' — use: rgb, irrx, irtx, pullup, pulldown\n", func);
         return;
     }
 
