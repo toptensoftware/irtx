@@ -2,8 +2,8 @@
 #include "config.h"
 #include "gpio_config.h"
 
-int     gpioIrTxPin   = IR_TX_PIN_DEFAULT;
-int     gpioIrRxPin   = IR_RX_PIN_DEFAULT;
+int     gpioIrTxPin   = -1;
+int     gpioIrRxPin   = -1;
 uint8_t gpioPullupPins[MAX_GPIO_PULL_PINS]   = {};
 uint8_t gpioPullupCount  = 0;
 uint8_t gpioPulldownPins[MAX_GPIO_PULL_PINS] = {};
@@ -49,8 +49,8 @@ void setupGpioConfig()
 {
     extern Preferences prefs;
     prefs.begin("gpio", true);
-    gpioIrTxPin      = prefs.getInt("irtx", IR_TX_PIN_DEFAULT);
-    gpioIrRxPin      = prefs.getInt("irrx", IR_RX_PIN_DEFAULT);
+    gpioIrTxPin      = prefs.getInt("irtx", -1);
+    gpioIrRxPin      = prefs.getInt("irrx", -1);
     gpioPullupCount  = (uint8_t)prefs.getBytes("pullup",   gpioPullupPins,   MAX_GPIO_PULL_PINS);
     gpioPulldownCount = (uint8_t)prefs.getBytes("pulldown", gpioPulldownPins, MAX_GPIO_PULL_PINS);
     prefs.end();
