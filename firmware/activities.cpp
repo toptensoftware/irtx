@@ -32,10 +32,16 @@ static uint32_t      s_modifierProtocol = 0;
 static uint64_t      s_modifierValue    = 0;
 static unsigned long s_modifierExpiry   = 0;
 
-// ---- Hold time tracking ----
+// ---- Hold time tracking (IR) ----
 static uint32_t      s_holdProtocol = 0;
 static uint64_t      s_holdValue    = 0;
 static unsigned long s_holdStartMs  = 0;
+
+// ---- GPIO button hold / repeat state ----
+static int           s_gpioHoldPin      = -1;
+static unsigned long s_gpioPressStartMs = 0;
+static uint32_t      s_gpioRepeatRate   = 0;
+static unsigned long s_gpioNextRepeatMs = 0;
 
 // ---- Internal "commit activity" op ----
 // Used as the last item enqueued during a switch so that s_currentActivity
@@ -602,6 +608,110 @@ void switchActivity(int newIndex)
     enqueueOp((op*)&s_commitOp);
 }
 
+// ---- GPIO binding helpers ----
+
+// Scan the current activity for GPIO bindings matching pin+kindMask with held >= minHoldTime.
+static void fireGpioEvent(int pin, uint32_t kindMask, unsigned long held)
+{
+    if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
+    activity* act = &activitiesConfig->activities[s_currentActivity];
+
+    for (uint32_t i = 0; i < act->bindings_count; i++)
+    {
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_GPIO) continue;
+
+        bindingGpio* bg = (bindingGpio*)b;
+        if ((int)bg->pin != pin)            continue;
+        if (!(bg->eventMask & kindMask))    continue;
+        if (held < bg->minHoldTime)         continue;
+
+        VERBOSE("GPIO binding #%u matched pin=%d\n", i, pin);
+        enqueueOps(b->doOps, b->doOps_count);
+
+        if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING)) break;
+    }
+}
+
+void invokeGpioBindings(int pin, bool pressed)
+{
+    unsigned long now = millis();
+
+    if (pressed)
+    {
+        s_gpioHoldPin      = pin;
+        s_gpioPressStartMs = now;
+        s_gpioRepeatRate   = 0;
+        s_gpioNextRepeatMs = 0;
+
+        // Find the first press binding to configure repeat timing.
+        if (activitiesConfig && activitiesConfig->activities_count > 0)
+        {
+            activity* act = &activitiesConfig->activities[s_currentActivity];
+            for (uint32_t i = 0; i < act->bindings_count; i++)
+            {
+                binding* b = act->bindings[i];
+                if (b->type != BINDING_TYPE_GPIO) continue;
+                bindingGpio* bg = (bindingGpio*)b;
+                if ((int)bg->pin != pin) continue;
+                if (!(bg->eventMask & IR_EVENT_KIND_MASK_PRESS)) continue;
+                if (bg->repeatRate > 0)
+                {
+                    s_gpioRepeatRate   = bg->repeatRate;
+                    uint32_t firstDelay = bg->initialDelay > 0 ? bg->initialDelay : bg->repeatRate;
+                    s_gpioNextRepeatMs = now + firstDelay;
+                }
+                break;
+            }
+        }
+
+        fireGpioEvent(pin, IR_EVENT_KIND_MASK_PRESS, 0);
+    }
+    else
+    {
+        // Only stop repeat tracking if this is the currently tracked (last-pressed) pin.
+        // Releasing an earlier pin must not disturb repeat for the pin still held.
+        unsigned long held = 0;
+        if (pin == s_gpioHoldPin)
+        {
+            held             = now - s_gpioPressStartMs;
+            s_gpioHoldPin    = -1;
+            s_gpioRepeatRate = 0;
+        }
+
+        fireGpioEvent(pin, IR_EVENT_KIND_MASK_RELEASE, held);
+    }
+}
+
+// ---- Encoder binding helpers ----
+
+// Scan the current activity for encoder bindings matching pin, direction, and velocity.
+// Bindings are ordered by minVelocityPeriod descending (slow-only first, catch-all last)
+// so earlier matches abort routing before less-specific ones fire — mirroring how button
+// minHoldTime works (long-press bindings before short-press ones).
+void invokeEncoderBindings(int pin, int direction, uint32_t velocity)
+{
+    if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
+    activity* act = &activitiesConfig->activities[s_currentActivity];
+
+    for (uint32_t i = 0; i < act->bindings_count; i++)
+    {
+        binding* b = act->bindings[i];
+        if (b->type != BINDING_TYPE_GPIO_ENCODER) continue;
+
+        bindingGpioEncoder* be = (bindingGpioEncoder*)b;
+        if ((int)be->pin != pin)                          continue;
+        if (be->direction != 0 && be->direction != direction) continue;
+        if (velocity < be->minVelocityPeriod)             continue;
+
+        VERBOSE("Encoder binding #%u matched pin=%d dir=%d\n", i, pin, direction);
+        enqueueOps(b->doOps, b->doOps_count);
+
+        if (!(b->flags & BINDING_FLAGS_CONTINUE_ROUTING)) break;
+    }
+}
+
+
 // ---- Binding matcher (called from IR RX on every decoded code) ----
 void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
 {
@@ -876,6 +986,8 @@ bool reloadActivities()
     s_stringReg        = "";
     s_boolReg          = false;
     s_irReg            = {0, 0};
+    s_gpioHoldPin      = -1;
+    s_gpioRepeatRate   = 0;
 
     xSemaphoreTake(s_httpMutex, portMAX_DELAY);
     s_httpDoneGen      = s_httpCurrentGen;  // discard any pending result
@@ -900,6 +1012,17 @@ void pollActivities()
     if (s_modifierProtocol != 0 && millis() >= s_modifierExpiry)
     {
         clearModifier();
+    }
+
+    // Synthesize GPIO button repeat events.
+    if (s_gpioHoldPin >= 0 && s_gpioRepeatRate > 0)
+    {
+        unsigned long now = millis();
+        if (now >= s_gpioNextRepeatMs)
+        {
+            fireGpioEvent(s_gpioHoldPin, IR_EVENT_KIND_MASK_REPEAT, now - s_gpioPressStartMs);
+            s_gpioNextRepeatMs = now + s_gpioRepeatRate;
+        }
     }
 
     // Poll the currently-running timed op (delay, LED, …).

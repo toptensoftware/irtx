@@ -24,6 +24,7 @@
 #include "driver/rmt_rx.h"
 #include "esp_timer.h"
 #include "config.h"
+#include "gpio_config.h"
 #include "ir_decoder.h"
 #include "activities.h"
 #include "ir_rx.h"

@@ -22,6 +22,7 @@
 #include "filesystem.h"
 #include "http.h"
 #include "activities.h"
+#include "gpio_config.h"
 
 void setup()
 {
@@ -32,6 +33,7 @@ void setup()
     Serial.println("\n=== ESP32 IR Remote ===");
 
     setupDeviceName();
+    setupGpioConfig();
     setupIrTx();
     setupIrRx();
     setupFs();
@@ -46,6 +48,7 @@ void setup()
 void loop()
 {
     pollSerial();
+    pollGpio();
     pollIrRx();
     pollIrTx();
     pollWifi();

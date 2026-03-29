@@ -24,5 +24,11 @@ void switchActivity(int index);
 // Called by the IR RX path on every decoded code to check active bindings.
 void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind);
 
+// Called by the GPIO poll path when a button changes state.
+void invokeGpioBindings(int pin, bool pressed);
+
+// Called by the GPIO poll path on every encoder detent.
+void invokeEncoderBindings(int pin, int direction, uint32_t velocity);
+
 // Print activities/device status to the console.
 void statusActivities();

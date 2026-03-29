@@ -2,6 +2,7 @@
 #include "driver/rmt_tx.h"
 #include "driver/rmt_encoder.h"
 #include "config.h"
+#include "gpio_config.h"
 #include "led.h"
 #include "ir_tx.h"
 #include "ir_protocol.h"

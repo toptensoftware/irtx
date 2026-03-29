@@ -10,6 +10,7 @@
 #include "esp_system.h"
 #include "ir_protocol.h"
 #include "activities.h"
+#include "gpio_config.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -124,9 +125,50 @@ void handleCommand(const char* line)
         else
             switchActivity(idx);
     }
+    else if (strncmp(line, "gpio", 4) == 0 && (line[4] == ' ' || line[4] == '\0'))
+    {
+        const char* p = line + 4;
+        while (*p == ' ') p++;
+
+        if (*p == '\0')
+        {
+            statusGpioConfig();
+            return;
+        }
+
+        char* end;
+        int pinA = (int)strtol(p, &end, 10);
+        if (end == p)
+        {
+            PRINT("Usage: gpio [<pin> [<pin>] <grb|rgb|irrx|irtx|pullup|pulldown>]\n");
+            return;
+        }
+        p = end;
+        while (*p == ' ') p++;
+
+        // Optional second pin (for encoder pairs)
+        int pinB = -1;
+        char* end2;
+        long maybePin = strtol(p, &end2, 10);
+        if (end2 != p && (*end2 == ' ' || *end2 == '\0'))
+        {
+            pinB = (int)maybePin;
+            p = end2;
+            while (*p == ' ') p++;
+        }
+
+        if (*p == '\0')
+        {
+            PRINT("Usage: gpio [<pin> [<pin>] <grb|rgb|irrx|irtx|pullup|pulldown>]\n");
+            return;
+        }
+
+        gpioSetPin(pinA, pinB, p);
+    }
     else if (strcmp(line, "status") == 0)
     {
         statusDeviceName();
+        statusGpioConfig();
         statusProtocols();
         statusWifi();
         statusBle();
