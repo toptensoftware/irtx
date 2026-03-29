@@ -137,22 +137,33 @@ void handleCommand(const char* line)
         }
 
         char* end;
-        int pin = (int)strtol(p, &end, 10);
+        int pinA = (int)strtol(p, &end, 10);
         if (end == p)
         {
-            PRINT("Usage: gpio [<pin> <irrx|irtx|pullup|pulldown>]\n");
+            PRINT("Usage: gpio [<pin> [<pin>] <irrx|irtx|pullup|pulldown>]\n");
             return;
         }
         p = end;
         while (*p == ' ') p++;
 
+        // Optional second pin (for encoder pairs)
+        int pinB = -1;
+        char* end2;
+        long maybePin = strtol(p, &end2, 10);
+        if (end2 != p && (*end2 == ' ' || *end2 == '\0'))
+        {
+            pinB = (int)maybePin;
+            p = end2;
+            while (*p == ' ') p++;
+        }
+
         if (*p == '\0')
         {
-            PRINT("Usage: gpio [<pin> <irrx|irtx|pullup|pulldown>]\n");
+            PRINT("Usage: gpio [<pin> [<pin>] <irrx|irtx|pullup|pulldown>]\n");
             return;
         }
 
-        gpioSetPin(pin, p);
+        gpioSetPin(pinA, pinB, p);
     }
     else if (strcmp(line, "status") == 0)
     {

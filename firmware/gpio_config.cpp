@@ -2,13 +2,15 @@
 #include "config.h"
 #include "gpio_config.h"
 
-int     gpioIrTxPin   = -1;
-int     gpioIrRxPin   = -1;
-uint8_t gpioPullupPins[MAX_GPIO_PULL_PINS]   = {};
-uint8_t gpioPullupCount  = 0;
-uint8_t gpioPulldownPins[MAX_GPIO_PULL_PINS] = {};
-uint8_t gpioPulldownCount = 0;
+int         gpioIrTxPin    = -1;
+int         gpioIrRxPin    = -1;
+GpioPinSlot gpioPullupSlots[MAX_GPIO_PULL_PINS]   = {};
+uint8_t     gpioPullupCount  = 0;
+GpioPinSlot gpioPulldownSlots[MAX_GPIO_PULL_PINS] = {};
+uint8_t     gpioPulldownCount = 0;
 
+// Remove any slot containing pin from both pullup and pulldown lists.
+// Also clears irtx/irrx if they match.
 static void removePinFromAllRoles(int pin)
 {
     if (gpioIrTxPin == pin) gpioIrTxPin = -1;
@@ -16,18 +18,22 @@ static void removePinFromAllRoles(int pin)
 
     for (int i = 0; i < gpioPullupCount; i++)
     {
-        if (gpioPullupPins[i] == (uint8_t)pin)
+        if (gpioPullupSlots[i].pinA == (uint8_t)pin ||
+            gpioPullupSlots[i].pinB == (uint8_t)pin)
         {
-            memmove(&gpioPullupPins[i], &gpioPullupPins[i + 1], gpioPullupCount - i - 1);
+            memmove(&gpioPullupSlots[i], &gpioPullupSlots[i + 1],
+                    (gpioPullupCount - i - 1) * sizeof(GpioPinSlot));
             gpioPullupCount--;
             break;
         }
     }
     for (int i = 0; i < gpioPulldownCount; i++)
     {
-        if (gpioPulldownPins[i] == (uint8_t)pin)
+        if (gpioPulldownSlots[i].pinA == (uint8_t)pin ||
+            gpioPulldownSlots[i].pinB == (uint8_t)pin)
         {
-            memmove(&gpioPulldownPins[i], &gpioPulldownPins[i + 1], gpioPulldownCount - i - 1);
+            memmove(&gpioPulldownSlots[i], &gpioPulldownSlots[i + 1],
+                    (gpioPulldownCount - i - 1) * sizeof(GpioPinSlot));
             gpioPulldownCount--;
             break;
         }
@@ -40,28 +46,53 @@ static void saveToNvs()
     prefs.begin("gpio", false);
     prefs.putInt("irtx", gpioIrTxPin);
     prefs.putInt("irrx", gpioIrRxPin);
-    prefs.putBytes("pullup",   gpioPullupPins,   gpioPullupCount);
-    prefs.putBytes("pulldown", gpioPulldownPins, gpioPulldownCount);
+    prefs.putBytes("pullup",   gpioPullupSlots,   gpioPullupCount   * sizeof(GpioPinSlot));
+    prefs.putBytes("pulldown", gpioPulldownSlots, gpioPulldownCount * sizeof(GpioPinSlot));
     prefs.end();
+}
+
+static void applyPullModes(GpioPinSlot* slots, uint8_t count, int mode)
+{
+    for (int i = 0; i < count; i++)
+    {
+        pinMode(slots[i].pinA, mode);
+        if (slots[i].pinB != GPIO_PIN_NONE)
+            pinMode(slots[i].pinB, mode);
+    }
 }
 
 void setupGpioConfig()
 {
     extern Preferences prefs;
     prefs.begin("gpio", true);
-    gpioIrTxPin      = prefs.getInt("irtx", -1);
-    gpioIrRxPin      = prefs.getInt("irrx", -1);
-    gpioPullupCount  = (uint8_t)prefs.getBytes("pullup",   gpioPullupPins,   MAX_GPIO_PULL_PINS);
-    gpioPulldownCount = (uint8_t)prefs.getBytes("pulldown", gpioPulldownPins, MAX_GPIO_PULL_PINS);
+    gpioIrTxPin = prefs.getInt("irtx", -1);
+    gpioIrRxPin = prefs.getInt("irrx", -1);
+    size_t upBytes   = prefs.getBytes("pullup",   gpioPullupSlots,
+                                      MAX_GPIO_PULL_PINS * sizeof(GpioPinSlot));
+    size_t downBytes = prefs.getBytes("pulldown", gpioPulldownSlots,
+                                      MAX_GPIO_PULL_PINS * sizeof(GpioPinSlot));
     prefs.end();
 
-    for (int i = 0; i < gpioPullupCount; i++)
-        pinMode(gpioPullupPins[i], INPUT_PULLUP);
-    for (int i = 0; i < gpioPulldownCount; i++)
-        pinMode(gpioPulldownPins[i], INPUT_PULLDOWN);
+    gpioPullupCount   = (uint8_t)(upBytes   / sizeof(GpioPinSlot));
+    gpioPulldownCount = (uint8_t)(downBytes / sizeof(GpioPinSlot));
+
+    applyPullModes(gpioPullupSlots,   gpioPullupCount,   INPUT_PULLUP);
+    applyPullModes(gpioPulldownSlots, gpioPulldownCount, INPUT_PULLDOWN);
 
     LOG("GPIO config: irtx=%d irrx=%d pullup=%d pulldown=%d\n",
         gpioIrTxPin, gpioIrRxPin, gpioPullupCount, gpioPulldownCount);
+}
+
+static void printSlots(GpioPinSlot* slots, uint8_t count)
+{
+    if (count == 0) { PRINT(" (none)"); return; }
+    for (int i = 0; i < count; i++)
+    {
+        if (slots[i].pinB == GPIO_PIN_NONE)
+            PRINT(" %d", slots[i].pinA);
+        else
+            PRINT(" %d+%d", slots[i].pinA, slots[i].pinB);
+    }
 }
 
 void statusGpioConfig()
@@ -69,56 +100,54 @@ void statusGpioConfig()
     PRINT("IR TX pin: %d\n", gpioIrTxPin);
     PRINT("IR RX pin: %d\n", gpioIrRxPin);
 
-    PRINT("Pullup pins (%d):", gpioPullupCount);
-    if (gpioPullupCount == 0)
-        PRINT(" (none)");
-    for (int i = 0; i < gpioPullupCount; i++)
-        PRINT(" %d", gpioPullupPins[i]);
+    PRINT("Pullup slots (%d):", gpioPullupCount);
+    printSlots(gpioPullupSlots, gpioPullupCount);
     PRINT("\n");
 
-    PRINT("Pulldown pins (%d):", gpioPulldownCount);
-    if (gpioPulldownCount == 0)
-        PRINT(" (none)");
-    for (int i = 0; i < gpioPulldownCount; i++)
-        PRINT(" %d", gpioPulldownPins[i]);
+    PRINT("Pulldown slots (%d):", gpioPulldownCount);
+    printSlots(gpioPulldownSlots, gpioPulldownCount);
     PRINT("\n");
 }
 
-void gpioSetPin(int pin, const char* func)
+void gpioSetPin(int pinA, int pinB, const char* func)
 {
-    if (pin < 0)
+    if (pinA < 0)
     {
-        PRINT("Invalid pin: %d\n", pin);
+        PRINT("Invalid pin: %d\n", pinA);
         return;
     }
 
-    removePinFromAllRoles(pin);
+    removePinFromAllRoles(pinA);
+    if (pinB >= 0)
+        removePinFromAllRoles(pinB);
 
     if (strcmp(func, "irtx") == 0)
     {
-        gpioIrTxPin = pin;
+        gpioIrTxPin = pinA;
     }
     else if (strcmp(func, "irrx") == 0)
     {
-        gpioIrRxPin = pin;
+        gpioIrRxPin = pinA;
     }
     else if (strcmp(func, "pullup") == 0)
     {
         if (gpioPullupCount >= MAX_GPIO_PULL_PINS)
         {
-            PRINT("Error: max %d pullup pins already configured\n", MAX_GPIO_PULL_PINS);
+            PRINT("Error: max %d pullup slots already configured\n", MAX_GPIO_PULL_PINS);
             return;
         }
-        gpioPullupPins[gpioPullupCount++] = (uint8_t)pin;
+        gpioPullupSlots[gpioPullupCount++] = { (uint8_t)pinA,
+                                               pinB >= 0 ? (uint8_t)pinB : GPIO_PIN_NONE };
     }
     else if (strcmp(func, "pulldown") == 0)
     {
         if (gpioPulldownCount >= MAX_GPIO_PULL_PINS)
         {
-            PRINT("Error: max %d pulldown pins already configured\n", MAX_GPIO_PULL_PINS);
+            PRINT("Error: max %d pulldown slots already configured\n", MAX_GPIO_PULL_PINS);
             return;
         }
-        gpioPulldownPins[gpioPulldownCount++] = (uint8_t)pin;
+        gpioPulldownSlots[gpioPulldownCount++] = { (uint8_t)pinA,
+                                                   pinB >= 0 ? (uint8_t)pinB : GPIO_PIN_NONE };
     }
     else
     {
@@ -127,5 +156,9 @@ void gpioSetPin(int pin, const char* func)
     }
 
     saveToNvs();
-    PRINT("GPIO %d → %s (reboot to apply)\n", pin, func);
+
+    if (pinB >= 0)
+        PRINT("GPIO %d+%d → %s (reboot to apply)\n", pinA, pinB, func);
+    else
+        PRINT("GPIO %d → %s (reboot to apply)\n", pinA, func);
 }

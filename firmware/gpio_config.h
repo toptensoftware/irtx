@@ -3,13 +3,19 @@
 #include <stdint.h>
 
 #define MAX_GPIO_PULL_PINS 16
+#define GPIO_PIN_NONE      0xFF
 
-extern int     gpioIrTxPin;
-extern int     gpioIrRxPin;
-extern uint8_t gpioPullupPins[MAX_GPIO_PULL_PINS];
-extern uint8_t gpioPullupCount;
-extern uint8_t gpioPulldownPins[MAX_GPIO_PULL_PINS];
-extern uint8_t gpioPulldownCount;
+struct GpioPinSlot {
+    uint8_t pinA;
+    uint8_t pinB;   // GPIO_PIN_NONE if single-pin slot
+};
+
+extern int          gpioIrTxPin;
+extern int          gpioIrRxPin;
+extern GpioPinSlot  gpioPullupSlots[MAX_GPIO_PULL_PINS];
+extern uint8_t      gpioPullupCount;
+extern GpioPinSlot  gpioPulldownSlots[MAX_GPIO_PULL_PINS];
+extern uint8_t      gpioPulldownCount;
 
 // Override compile-time pin defaults with runtime-configurable variables.
 // Any file that needs the actual runtime pin must include this header.
@@ -18,4 +24,4 @@ extern uint8_t gpioPulldownCount;
 
 void setupGpioConfig();
 void statusGpioConfig();
-void gpioSetPin(int pin, const char* func);
+void gpioSetPin(int pinA, int pinB, const char* func);
