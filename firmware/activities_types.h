@@ -23,7 +23,7 @@ extern "C" {
 // binding_type
 #define BINDING_TYPE_IR 1
 #define BINDING_TYPE_IR_ANY 2
-#define BINDING_TYPE_GPIO         3
+#define BINDING_TYPE_GPIO 3
 #define BINDING_TYPE_GPIO_ENCODER 4
 
 // binding_flags
@@ -247,16 +247,6 @@ struct __attribute__((packed)) bindingIrAny
 };
 static_assert(sizeof(bindingIrAny) == 16, "Size of bindingIrAny must be 16 bytes");
 
-// bindingGpioEncoder
-struct __attribute__((packed)) bindingGpioEncoder
-{
-	/*    0 */	binding base;
-	/*   16 */	uint32_t pin;
-	/*   20 */	int32_t  direction;          // -1=CCW, 0=any, 1=CW
-	/*   24 */	uint32_t minVelocityPeriod;  // ms; 0=any speed; fires when velocity >= this
-};
-static_assert(sizeof(bindingGpioEncoder) == 28, "Size of bindingGpioEncoder must be 28 bytes");
-
 // bindingGpio
 struct __attribute__((packed)) bindingGpio
 {
@@ -268,6 +258,16 @@ struct __attribute__((packed)) bindingGpio
 	/*   32 */	uint32_t repeatRate;
 };
 static_assert(sizeof(bindingGpio) == 36, "Size of bindingGpio must be 36 bytes");
+
+// bindingGpioEncoder
+struct __attribute__((packed)) bindingGpioEncoder
+{
+	/*    0 */	binding base;
+	/*   16 */	uint32_t pin;
+	/*   20 */	int32_t direction;
+	/*   24 */	uint32_t minVelocityPeriod;
+};
+static_assert(sizeof(bindingGpioEncoder) == 28, "Size of bindingGpioEncoder must be 28 bytes");
 
 #ifdef __cplusplus
 }

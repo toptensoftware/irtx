@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "config.h"
-#include "gpio_config.h"
+#include "gpio.h"
 #include "activities.h"
 
 int         gpioIrTxPin    = -1;
@@ -11,6 +11,19 @@ GpioPinSlot gpioPullupSlots[MAX_GPIO_PULL_PINS]   = {};
 uint8_t     gpioPullupCount  = 0;
 GpioPinSlot gpioPulldownSlots[MAX_GPIO_PULL_PINS] = {};
 uint8_t     gpioPulldownCount = 0;
+
+
+static void onButton(int pin, bool pressed)
+{
+    VERBOSE("Button %d %s\n", pin, pressed ? "pressed" : "released");
+    invokeGpioBindings(pin, pressed);
+}
+
+static void onEncoder(int pin, int direction, uint32_t velocity)
+{
+    VERBOSE("Encoder %d dir=%+d velocity=%ums\n", pin, direction, velocity);
+    invokeEncoderBindings(pin, direction, velocity);
+}
 
 // Remove any slot containing pin from both pullup and pulldown lists.
 // Also clears irtx/irrx if they match.
@@ -314,14 +327,3 @@ void pollGpio()
     pollPullSlots(gpioPulldownSlots, gpioPulldownCount, false, s_btnDown, s_encDown);
 }
 
-void onButton(int pin, bool pressed)
-{
-    VERBOSE("Button %d %s\n", pin, pressed ? "pressed" : "released");
-    invokeGpioBindings(pin, pressed);
-}
-
-void onEncoder(int pin, int direction, uint32_t velocity)
-{
-    VERBOSE("Encoder %d dir=%+d velocity=%ums\n", pin, direction, velocity);
-    invokeEncoderBindings(pin, direction, velocity);
-}

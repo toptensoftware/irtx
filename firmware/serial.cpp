@@ -10,7 +10,7 @@
 #include "esp_system.h"
 #include "ir_protocol.h"
 #include "activities.h"
-#include "gpio_config.h"
+#include "gpio.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;

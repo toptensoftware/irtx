@@ -22,7 +22,7 @@
 #include "filesystem.h"
 #include "http.h"
 #include "activities.h"
-#include "gpio_config.h"
+#include "gpio.h"
 
 void setup()
 {

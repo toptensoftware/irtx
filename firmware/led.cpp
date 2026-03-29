@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include "config.h"
-#include "gpio_config.h"
+#include "gpio.h"
 
 
 static uint32_t colors[] = { 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, };
