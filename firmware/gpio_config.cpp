@@ -189,7 +189,8 @@ void gpioSetPin(int pinA, int pinB, const char* func)
 
 // ─── Poll state ────────────────────────────────────────────────────────────────
 
-#define BUTTON_DEBOUNCE_MS 10
+#define BUTTON_DEBOUNCE_MS  10
+#define ENCODER_DEBOUNCE_MS  2  // min ms between accepted encoder transitions
 
 static struct ButtonState {
     bool     raw;           // last raw digitalRead
@@ -208,10 +209,11 @@ static const int8_t s_encTable[16] = {
 };
 
 static struct EncoderState {
-    uint8_t  prevAB;        // last A+B reading
-    int8_t   accum;         // signed tick accumulator; fire at ±4
-    uint32_t tickTimes[4];  // circular buffer of last 4 tick timestamps (ms)
-    uint8_t  tickHead;      // next write position in tickTimes
+    uint8_t  prevAB;            // last A+B reading
+    int8_t   accum;             // signed tick accumulator; fire at ±4
+    uint32_t tickTimes[4];      // circular buffer of last 4 tick timestamps (ms)
+    uint8_t  tickHead;          // next write position in tickTimes
+    uint32_t lastTransitionMs;  // time of last accepted transition (for debounce)
 } s_encUp[MAX_GPIO_PULL_PINS], s_encDown[MAX_GPIO_PULL_PINS];
 
 static void initPollSlotState(GpioPinSlot* slots, uint8_t count,
@@ -231,9 +233,10 @@ static void initPollSlotState(GpioPinSlot* slots, uint8_t count,
         {
             uint8_t a = (uint8_t)digitalRead(slots[i].pinA);
             uint8_t b = (uint8_t)digitalRead(slots[i].pinB);
-            enc[i].prevAB  = (a << 1) | b;
-            enc[i].accum   = 0;
-            enc[i].tickHead = 0;
+            enc[i].prevAB           = (a << 1) | b;
+            enc[i].accum            = 0;
+            enc[i].tickHead         = 0;
+            enc[i].lastTransitionMs = now;
             for (int j = 0; j < 4; j++) enc[i].tickTimes[j] = now;
         }
     }
@@ -272,11 +275,13 @@ static void pollEncoderSlot(int pinA, int pinB, EncoderState& s)
     if (ab == s.prevAB) return;
 
     int8_t dir = s_encTable[(s.prevAB << 2) | ab];
-    s.prevAB = ab;
+    s.prevAB = ab;  // always track current state regardless of debounce or validity
 
-    if (dir == 0) return;   // invalid transition, ignore
+    if (dir == 0) return;   // invalid grey-code transition (noise), ignore
 
     uint32_t now = millis();
+    if (now - s.lastTransitionMs < ENCODER_DEBOUNCE_MS) return;
+    s.lastTransitionMs = now;
     s.tickTimes[s.tickHead] = now;
     s.tickHead = (s.tickHead + 1) % 4;
     s.accum += dir;
