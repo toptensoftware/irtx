@@ -25,3 +25,9 @@ extern uint8_t      gpioPulldownCount;
 void setupGpioConfig();
 void statusGpioConfig();
 void gpioSetPin(int pinA, int pinB, const char* func);
+
+void pollGpio();
+
+// Callbacks — weak stubs are provided; override in application code.
+void onButton(int pin, bool pressed);
+void onEncoder(int pin, int direction, uint32_t velocity);

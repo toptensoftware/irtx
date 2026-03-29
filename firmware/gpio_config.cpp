@@ -51,6 +51,8 @@ static void saveToNvs()
     prefs.end();
 }
 
+static void initPollState();  // forward declaration — defined below
+
 static void applyPullModes(GpioPinSlot* slots, uint8_t count, int mode)
 {
     for (int i = 0; i < count; i++)
@@ -78,6 +80,7 @@ void setupGpioConfig()
 
     applyPullModes(gpioPullupSlots,   gpioPullupCount,   INPUT_PULLUP);
     applyPullModes(gpioPulldownSlots, gpioPulldownCount, INPUT_PULLDOWN);
+    initPollState();
 
     LOG("GPIO config: irtx=%d irrx=%d pullup=%d pulldown=%d\n",
         gpioIrTxPin, gpioIrRxPin, gpioPullupCount, gpioPulldownCount);
@@ -161,4 +164,138 @@ void gpioSetPin(int pinA, int pinB, const char* func)
         PRINT("GPIO %d+%d → %s (reboot to apply)\n", pinA, pinB, func);
     else
         PRINT("GPIO %d → %s (reboot to apply)\n", pinA, func);
+}
+
+// ─── Poll state ────────────────────────────────────────────────────────────────
+
+#define BUTTON_DEBOUNCE_MS 10
+
+static struct ButtonState {
+    bool     raw;           // last raw digitalRead
+    bool     stable;        // debounced state (true = HIGH)
+    uint32_t rawChangeMs;   // when raw last changed
+} s_btnUp[MAX_GPIO_PULL_PINS], s_btnDown[MAX_GPIO_PULL_PINS];
+
+// Quadrature grey-code lookup: index = (prevAB << 2) | currAB
+// Returns +1 (CW), -1 (CCW), or 0 (no change / invalid)
+static const int8_t s_encTable[16] = {
+//  curr→  00   01   10   11
+           0,   1,  -1,   0,   // prev 00
+          -1,   0,   0,   1,   // prev 01
+           1,   0,   0,  -1,   // prev 10
+           0,  -1,   1,   0,   // prev 11
+};
+
+static struct EncoderState {
+    uint8_t  prevAB;        // last A+B reading
+    int8_t   accum;         // signed tick accumulator; fire at ±4
+    uint32_t tickTimes[4];  // circular buffer of last 4 tick timestamps (ms)
+    uint8_t  tickHead;      // next write position in tickTimes
+} s_encUp[MAX_GPIO_PULL_PINS], s_encDown[MAX_GPIO_PULL_PINS];
+
+static void initPollSlotState(GpioPinSlot* slots, uint8_t count,
+                               ButtonState* btn, EncoderState* enc)
+{
+    uint32_t now = millis();
+    for (int i = 0; i < count; i++)
+    {
+        if (slots[i].pinB == GPIO_PIN_NONE)
+        {
+            bool raw = (bool)digitalRead(slots[i].pinA);
+            btn[i].raw        = raw;
+            btn[i].stable     = raw;
+            btn[i].rawChangeMs = now;
+        }
+        else
+        {
+            uint8_t a = (uint8_t)digitalRead(slots[i].pinA);
+            uint8_t b = (uint8_t)digitalRead(slots[i].pinB);
+            enc[i].prevAB  = (a << 1) | b;
+            enc[i].accum   = 0;
+            enc[i].tickHead = 0;
+            for (int j = 0; j < 4; j++) enc[i].tickTimes[j] = now;
+        }
+    }
+}
+
+static void initPollState()
+{
+    initPollSlotState(gpioPullupSlots,   gpioPullupCount,   s_btnUp,   s_encUp);
+    initPollSlotState(gpioPulldownSlots, gpioPulldownCount, s_btnDown, s_encDown);
+}
+
+static void pollButtonSlot(int pin, bool pullup, ButtonState& s)
+{
+    bool raw = (bool)digitalRead(pin);
+    uint32_t now = millis();
+
+    if (raw != s.raw)
+    {
+        s.raw = raw;
+        s.rawChangeMs = now;
+    }
+    if (s.raw != s.stable && (now - s.rawChangeMs) >= BUTTON_DEBOUNCE_MS)
+    {
+        s.stable = s.raw;
+        bool pressed = pullup ? !s.stable : s.stable;
+        onButton(pin, pressed);
+    }
+}
+
+static void pollEncoderSlot(int pinA, int pinB, EncoderState& s)
+{
+    uint8_t a  = (uint8_t)digitalRead(pinA);
+    uint8_t b  = (uint8_t)digitalRead(pinB);
+    uint8_t ab = (a << 1) | b;
+
+    if (ab == s.prevAB) return;
+
+    int8_t dir = s_encTable[(s.prevAB << 2) | ab];
+    s.prevAB = ab;
+
+    if (dir == 0) return;   // invalid transition, ignore
+
+    uint32_t now = millis();
+    s.tickTimes[s.tickHead] = now;
+    s.tickHead = (s.tickHead + 1) % 4;
+    s.accum += dir;
+
+    if (s.accum >= 4 || s.accum <= -4)
+    {
+        int direction     = s.accum > 0 ? 1 : -1;
+        uint32_t oldest   = s.tickTimes[s.tickHead]; // tickHead now points to oldest
+        uint32_t velocity = now - oldest;
+        s.accum -= direction * 4;
+        onEncoder(pinA, direction, velocity);
+    }
+}
+
+static void pollPullSlots(GpioPinSlot* slots, uint8_t count, bool pullup,
+                           ButtonState* btn, EncoderState* enc)
+{
+    for (int i = 0; i < count; i++)
+    {
+        if (slots[i].pinB == GPIO_PIN_NONE)
+            pollButtonSlot(slots[i].pinA, pullup, btn[i]);
+        else
+            pollEncoderSlot(slots[i].pinA, slots[i].pinB, enc[i]);
+    }
+}
+
+void pollGpio()
+{
+    pollPullSlots(gpioPullupSlots,   gpioPullupCount,   true,  s_btnUp,   s_encUp);
+    pollPullSlots(gpioPulldownSlots, gpioPulldownCount, false, s_btnDown, s_encDown);
+}
+
+// ─── Default stubs — override in application code ─────────────────────────────
+
+void __attribute__((weak)) onButton(int pin, bool pressed)
+{
+    VERBOSE("Button %d %s\n", pin, pressed ? "pressed" : "released");
+}
+
+void __attribute__((weak)) onEncoder(int pin, int direction, uint32_t velocity)
+{
+    VERBOSE("Encoder %d dir=%+d velocity=%ums\n", pin, direction, velocity);
 }

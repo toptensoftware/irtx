@@ -48,6 +48,7 @@ void setup()
 void loop()
 {
     pollSerial();
+    pollGpio();
     pollIrRx();
     pollIrTx();
     pollWifi();
