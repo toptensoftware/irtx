@@ -10,6 +10,7 @@
 #include "esp_system.h"
 #include "ir_protocol.h"
 #include "activities.h"
+#include "gpio_config.h"
 
 static char inputLine[INPUT_MAX];
 static int  inputLen  = 0;
@@ -124,9 +125,39 @@ void handleCommand(const char* line)
         else
             switchActivity(idx);
     }
+    else if (strncmp(line, "gpio", 4) == 0 && (line[4] == ' ' || line[4] == '\0'))
+    {
+        const char* p = line + 4;
+        while (*p == ' ') p++;
+
+        if (*p == '\0')
+        {
+            statusGpioConfig();
+            return;
+        }
+
+        char* end;
+        int pin = (int)strtol(p, &end, 10);
+        if (end == p)
+        {
+            PRINT("Usage: gpio [<pin> <irrx|irtx|pullup|pulldown>]\n");
+            return;
+        }
+        p = end;
+        while (*p == ' ') p++;
+
+        if (*p == '\0')
+        {
+            PRINT("Usage: gpio [<pin> <irrx|irtx|pullup|pulldown>]\n");
+            return;
+        }
+
+        gpioSetPin(pin, p);
+    }
     else if (strcmp(line, "status") == 0)
     {
         statusDeviceName();
+        statusGpioConfig();
         statusProtocols();
         statusWifi();
         statusBle();
