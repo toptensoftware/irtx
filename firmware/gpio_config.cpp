@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "config.h"
 #include "gpio_config.h"
+#include "activities.h"
 
 int         gpioIrTxPin    = -1;
 int         gpioIrRxPin    = -1;
@@ -308,14 +309,14 @@ void pollGpio()
     pollPullSlots(gpioPulldownSlots, gpioPulldownCount, false, s_btnDown, s_encDown);
 }
 
-// ─── Default stubs — override in application code ─────────────────────────────
-
-void __attribute__((weak)) onButton(int pin, bool pressed)
+void onButton(int pin, bool pressed)
 {
     VERBOSE("Button %d %s\n", pin, pressed ? "pressed" : "released");
+    invokeGpioBindings(pin, pressed);
 }
 
-void __attribute__((weak)) onEncoder(int pin, int direction, uint32_t velocity)
+void onEncoder(int pin, int direction, uint32_t velocity)
 {
     VERBOSE("Encoder %d dir=%+d velocity=%ums\n", pin, direction, velocity);
+    invokeEncoderBindings(pin, direction, velocity);
 }

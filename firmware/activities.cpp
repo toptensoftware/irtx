@@ -683,12 +683,6 @@ void invokeGpioBindings(int pin, bool pressed)
     }
 }
 
-// Non-weak override: routes onButton() from gpio_config.cpp into activities.
-void onButton(int pin, bool pressed)
-{
-    invokeGpioBindings(pin, pressed);
-}
-
 // ---- Encoder binding helpers ----
 
 // Scan the current activity for encoder bindings matching pin, direction, and velocity.
@@ -717,11 +711,6 @@ void invokeEncoderBindings(int pin, int direction, uint32_t velocity)
     }
 }
 
-// Non-weak override: routes onEncoder() from gpio_config.cpp into activities.
-void onEncoder(int pin, int direction, uint32_t velocity)
-{
-    invokeEncoderBindings(pin, direction, velocity);
-}
 
 // ---- Binding matcher (called from IR RX on every decoded code) ----
 void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
