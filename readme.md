@@ -23,7 +23,7 @@ a command line tool for sending IR codes and compiling and uploading activity de
 
 ## Devices
 
-* `blaster` - a simple dumb IR blaster that can be placed inconspicously at the back of a room
+* [`blaster`](./blaster) - a simple dumb IR blaster that can be placed inconspicously at the back of a room
   providing a way to blast IR from any Wifi enabled device.
 
 
