@@ -104,46 +104,26 @@ The firmware for the esp32 is an Arduino project.  To build
 
     ```bash
     arduino-cli lib install "Adafruit NeoPixel"
+    arduino-cli config set library.enable_unsafe_install true
+    arduino-cli lib install --git-url https://github.com/h2zero/NimBLE-Arduino#nvs-custom-namespace
     #arduino-cli lib install "NimBLE-Arduino"
     ```
 
-4. Patch NumBLE.  
-
-    In order to support multiple virtual BLE devices a small change needs to be made 
-    to the NimBLE library. See the comment at the top of [ble.cpp](./firmware/ble.cpp).
-
-5. Build
+4. Build
 
     ```bash
     cd firmware
     ./build --build c3
     ```
 
-6. Flash (replace com8 with your serial port)
+5. Flash (replace com8 with your serial port)
 
     ```bash
     ./build --flash c3 com8
     ```
 
 
-The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.  Note the GPIO pins are different
-for C6:
-
-```c
-// C6
-#define IR_TX_PIN    11
-#define IR_RX_PIN    10
-```
-
-vs
-
-```c
-// C3
-#define IR_TX_PIN    4
-#define IR_RX_PIN    5
-```
-
-Or, adjust in [config.h](firmware/config.h).
+The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.  N
 
 ## Configuring the Device
 
@@ -160,6 +140,44 @@ Use a serial monitor program to configure the device.  The following serial term
  *   `reboot`                     - reboot the device
  *   `dmesg`                      - displays the message log (up to 50 past logged messages)
  *   `verbose on|off`             - enable or disable verbose logging (persisted across reboots)
+ *   `gpio <pin> <function>`      - configures GPIO pins
+
+By default, no GPIO pins are configured.
+
+To set the status LED neopixel to GRB format on pin 10 (eg: Waveshare C3 zero dev board)
+
+```
+gpio 10 grb
+```
+
+To set the status LED neopixel to GRB format on pin 8 (eg: Waveshare C6 WROOM dev board)
+
+```
+gpio 8 grb
+```
+
+To set the pins the IR receiver (eg pin 5) and transmitter (eg pin 4) are connected:
+
+```
+gpio 5 irrx
+gpio 4 irtx
+```
+
+To set a generic button input with pull down:
+
+```
+gpio 11 pulldown
+```
+
+To set a rotary encoder input, pass the A/B pin pair:
+
+```
+gpio 12 13 pulldown
+```
+
+Note: button and encoder inputs don't do anything unless also configured in the activities configuration to
+perform operations.
+
 
 
 ## Telnet Support
