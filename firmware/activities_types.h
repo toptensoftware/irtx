@@ -114,8 +114,9 @@ struct __attribute__((packed)) sendIrOp
 	/*    4 */	uint32_t protocol;
 	/*    8 */	uint64_t irCode;
 	/*   16 */	uint32_t ipAddr;
+	/*   20 */	uint32_t sendAsRepeat;
 };
-static_assert(sizeof(sendIrOp) == 20, "Size of sendIrOp must be 20 bytes");
+static_assert(sizeof(sendIrOp) == 24, "Size of sendIrOp must be 24 bytes");
 
 // sendWolOp
 struct __attribute__((packed)) sendWolOp

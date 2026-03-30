@@ -65,8 +65,14 @@ static void saveToNvs()
     prefs.putInt("irrx",     gpioIrRxPin);
     prefs.putInt("led",      gpioLedPin);
     prefs.putInt("ledorder", gpioLedOrder);
-    prefs.putBytes("pullup",   gpioPullupSlots,   gpioPullupCount   * sizeof(GpioPinSlot));
-    prefs.putBytes("pulldown", gpioPulldownSlots, gpioPulldownCount * sizeof(GpioPinSlot));
+    if (gpioPullupCount > 0)
+        prefs.putBytes("pullup",   gpioPullupSlots,   gpioPullupCount   * sizeof(GpioPinSlot));
+    else
+        prefs.remove("pullup");
+    if (gpioPulldownCount > 0)
+        prefs.putBytes("pulldown", gpioPulldownSlots, gpioPulldownCount * sizeof(GpioPinSlot));
+    else
+        prefs.remove("pulldown");
     prefs.end();
 }
 
@@ -151,7 +157,7 @@ void gpioSetPin(int pinA, int pinB, const char* func)
     if (strcmp(func, "none") == 0)
     {
     }
-    if (strcmp(func, "grb") == 0)
+    else if (strcmp(func, "grb") == 0)
     {
         gpioLedPin   = pinA;
         gpioLedOrder = GPIO_LED_ORDER_GRB;

@@ -119,7 +119,7 @@ export class op
         }
     }
 
-    static sendIr(irCode, ipAddr = 0)
+    static sendIr(irCode, ipAddr = 0, sendAsRepeat = false)
     {
         let m = irCode.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
         if (!m)
@@ -130,6 +130,7 @@ export class op
             protocol: riff(m[1]),
             irCode: BigInt("0x" + m[2]),
             ipAddr: parseIPv4(ipAddr),
+            sendAsRepeat: sendAsRepeat ? 1 : 0,
         }
     }
 
@@ -362,6 +363,7 @@ let types = [
         { name: "protocol", type: "uint", packMapper: riff },
         { name: "irCode", type: "ulong" },
         { name: "ipAddr", type: "uint", default: 0, packMapper: parseIPv4 },
+        { name: "sendAsRepeat", type: "uint", default: 0 },
     ]
 },
 

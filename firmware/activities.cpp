@@ -226,12 +226,29 @@ static void startSendIrOp(op* o)
 
 static bool pollSendIrOp(op* o)
 {
-    if (isIrTxBusy()) return false;
-
     sendIrOp* sio = (sendIrOp*)o;
     // protocol == 0 means use the IR code register (pass-through).
     uint32_t proto = sio->protocol ? sio->protocol : s_irReg.protocol;
     uint64_t code  = sio->protocol ? sio->irCode   : s_irReg.irCode;
+
+    if (isIrTxBusy())
+    {
+        if (sio->sendAsRepeat && sio->ipAddr == 0)
+        {
+            // If the same code is currently in-flight, send a repeat and unblock the op queue.
+            // If the pending slot is already full the repeat is dropped — that's acceptable.
+            uint32_t inflightProto;
+            uint64_t inflightCode;
+            if (getInflightIrCode(&inflightProto, &inflightCode) &&
+                inflightProto == proto && inflightCode == code)
+            {
+                handleIrCode(proto, code, true);
+                return true;
+            }
+        }
+        return false;
+    }
+
     if (sio->ipAddr == 0)
     {
         handleIrCode(proto, code, false);

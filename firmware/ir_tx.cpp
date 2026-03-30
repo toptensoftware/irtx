@@ -24,12 +24,22 @@ static uint32_t s_currentGap  = 0;
 static bool     s_gapWaiting  = false;
 static int64_t  s_gapExpiresAt = 0;
 
+// Protocol+code currently occupying the in-flight slot (only valid when set via handleIrCode).
+static bool     s_inflightCodeValid = false;
+static uint32_t s_inflightProtocol  = 0;
+static uint64_t s_inflightCode      = 0;
+
 // ---- Pending slot ----
 // Holds the next transmission while the in-flight slot is busy.
 static uint16_t s_pendingTimings[MAX_TIMING_VALUES + 1];
 static int      s_pendingCount = 0;
 static uint32_t s_pendingGap  = 0;
 static bool     s_hasPending  = false;
+
+// Protocol+code queued in the pending slot (only valid when set via handleIrCode).
+static bool     s_pendingCodeValid = false;
+static uint32_t s_pendingProtocol  = 0;
+static uint64_t s_pendingCode      = 0;
 
 // ---- Build RMT Symbols ----
 static void buildRmtSymbols(uint16_t* timings, int count)
@@ -124,6 +134,17 @@ bool isIrTxBusy()
     return s_rmtBusy || s_gapWaiting || s_hasPending;
 }
 
+// ---- In-flight code query ----
+// Returns true and fills protocol/code if a known IR code is currently in-flight (RMT or gap).
+// Returns false if IR TX is idle or the slot was filled by a raw timing packet.
+bool getInflightIrCode(uint32_t* protocol, uint64_t* code)
+{
+    if (!s_inflightCodeValid) return false;
+    *protocol = s_inflightProtocol;
+    *code     = s_inflightCode;
+    return true;
+}
+
 // ---- Poll ----
 void pollIrTx()
 {
@@ -149,6 +170,11 @@ void pollIrTx()
     if (!s_rmtBusy && !s_gapWaiting && s_hasPending)
     {
         s_hasPending = false;
+        // Promote pending code tracking to in-flight
+        s_inflightCodeValid = s_pendingCodeValid;
+        s_inflightProtocol  = s_pendingProtocol;
+        s_inflightCode      = s_pendingCode;
+        s_pendingCodeValid  = false;
         buildRmtSymbols(s_pendingTimings, s_pendingCount);
         if (s_rmtSymbolCount > 0)
             startTransmit(s_pendingGap);
@@ -217,6 +243,11 @@ void handleIrPacket(uint8_t* data, int length)
     memcpy(timings, data + IR_HEADER_SIZE, timingBytes);
 
     VERBOSE("IR TX: timings: [%i] gap: %i\n", timingCount, gap);
+    // Raw timing packets don't carry a protocol+code — clear whichever slot they occupy.
+    if (!s_rmtBusy && !s_gapWaiting)
+        s_inflightCodeValid = false;
+    else if (!s_hasPending)
+        s_pendingCodeValid = false;
     transmitTimingsNoLog(timings, timingCount, gap);
 }
 
@@ -263,5 +294,18 @@ void handleIrCode(uint32_t protocolId, uint64_t code, bool repeat)
     }
 
     VERBOSE("IR TX: protocol: 0x%08X code: 0x%016llX repeat: %i\n", protocolId, code, repeat ? 1 : 0);
+    // Track which slot this occupies so getInflightIrCode() can report what the TV is receiving.
+    if (!s_rmtBusy && !s_gapWaiting)
+    {
+        s_inflightCodeValid = true;
+        s_inflightProtocol  = protocolId;
+        s_inflightCode      = code;
+    }
+    else if (!s_hasPending)
+    {
+        s_pendingCodeValid = true;
+        s_pendingProtocol  = protocolId;
+        s_pendingCode      = code;
+    }
     transmitTimingsNoLog(timings, count, (uint32_t)gap);
 }
