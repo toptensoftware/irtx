@@ -233,17 +233,18 @@ static bool pollSendIrOp(op* o)
 
     if (isIrTxBusy())
     {
-        if (sio->sendAsRepeat && sio->ipAddr == 0)
+        if (sio->repeatBehaviour != 0 && sio->ipAddr == 0)
         {
-            // If the same code is currently in-flight, send a repeat and unblock the op queue.
-            // If the pending slot is already full the repeat is dropped — that's acceptable.
             uint32_t inflightProto;
             uint64_t inflightCode;
             if (getInflightIrCode(&inflightProto, &inflightCode) &&
                 inflightProto == proto && inflightCode == code)
             {
-                handleIrCode(proto, code, true);
-                return true;
+                // Same code is in-flight: handle according to repeatBehaviour.
+                if (sio->repeatBehaviour == 1)
+                    handleIrCode(proto, code, true);  // send NEC repeat (dropped if pending full)
+                // repeatBehaviour == 2: discard silently
+                return true;  // unblock op queue in both cases
             }
         }
         return false;

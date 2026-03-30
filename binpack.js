@@ -1,3 +1,9 @@
+export const repeatBehaviour = {
+    default:      0,   // block op queue until IR TX is free, then send full code
+    sendRepeat:   1,   // if same code in-flight: send NEC repeat and unblock; otherwise block
+    dropIfBusy:   2,   // if same code in-flight: discard and unblock; otherwise block
+};
+
 export const opId = {
     send_ir:         1,
     send_wol:        2,
@@ -119,7 +125,7 @@ export class op
         }
     }
 
-    static sendIr(irCode, ipAddr = 0, sendAsRepeat = false)
+    static sendIr(irCode, ipAddr = 0, repeat = repeatBehaviour.default)
     {
         let m = irCode.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
         if (!m)
@@ -130,7 +136,7 @@ export class op
             protocol: riff(m[1]),
             irCode: BigInt("0x" + m[2]),
             ipAddr: parseIPv4(ipAddr),
-            sendAsRepeat: sendAsRepeat ? 1 : 0,
+            repeatBehaviour: repeat,
         }
     }
 
@@ -363,7 +369,7 @@ let types = [
         { name: "protocol", type: "uint", packMapper: riff },
         { name: "irCode", type: "ulong" },
         { name: "ipAddr", type: "uint", default: 0, packMapper: parseIPv4 },
-        { name: "sendAsRepeat", type: "uint", default: 0 },
+        { name: "repeatBehaviour", type: "uint", default: 0 },
     ]
 },
 
