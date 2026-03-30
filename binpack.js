@@ -241,7 +241,7 @@ export class binding
         return {
             type: bindingType.gpio_encoder,
             pin: pin,
-            direction: 1,
+            direction: -1,
         }
     }
     
