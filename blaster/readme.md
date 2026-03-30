@@ -39,7 +39,7 @@ Notes:
 
 ## Print the Case
 
-This case supports IR transmitter circuitry only.  A version with IR receiver is not yet available.
+This case supports IR transmitter circuitry only. 
 
 ![case](./case/case.png)
 
@@ -78,7 +78,7 @@ There are three wires from the ESP32 Zero to the IR transmitter circuit.
 
 ## Configuring the Device
 
-Once the firmware has been built and flashed to the device ([see here](..)) the network
+Once the firmware has been built and flashed to the device ([see here](https://github.com/toptensoftware/irtx/#building-the-firmware)) the network
 and GPIO pins need to be configured.  Use a serial terminal program (eg: ttsm) to connect
 to the device and enter the following commands:
 
