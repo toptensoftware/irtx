@@ -1,93 +1,33 @@
 # irtx
 
-An open source, Wifi enabled IR Blaster, IR Router and BLE HID Blaster.
+An open source flexible firmware for ESP32 based Infrared transmitter/receivers.
 
-Features:
+irtx can act as a dumb blaster:
 
-* Receives IR commands over UDP and transmits using attached IR transmitter
+* Receive IR commands over UDP and transmits using an attached IR transmitter circuit
 * Accepts either raw timing data, or NEC or Panasonic encoded values
-* Can receive and decode IR signals, remap and re-transmit either locally, or send via UDP for retransmission
-  on a second irtx device or other UDP host
-* Can be paired with up to 4 BLE devices to send keyboard, mouse or consumer control HID packets
-* A NodeJS library [irtx-node](https://github.com/toptensoftware/irtx-node) can be used to control the device
+* Pair with up to 4 BLE devices to send keyboard, mouse or consumer control HID packets
 * Configuration and monitoring via serial or telnet
 
-![Final](./photos/final.jpeg)
+irtx can also act as a smart device listening for particular actions and invoking actions
+
+* Decode and match received IR signals (supports NEC and Panasonic protocols)
+* Handle input events from GPIO attached buttons and rotary encoders
+* Invoke sequences of operations in response to IR or GPIO input actions
+* Manage a set of "activities" and switch between them
+
+An accompanying NodeJS library [irtx-node](https://github.com/toptensoftware/irtx-node) can 
+be used to programatically control the device (eg: send IR codes).  It also provides
+a command line tool for sending IR codes and compiling and uploading activity definitions.
 
 
-## Build the Circuit
+## Devices
 
-The IR transmitter circuit is easy to build on a small piece of veroboard:
-
-Parts:
-
-* C1 - 100nf ceramic cap
-* C2 - 47uF electrolytic cap
-* R1 - 680R
-* R2 - 22R (or 10R, or 5R)
-* BC337 NPN transistor
-* 2x IR LEDs (like [these](https://www.jaycar.com.au/5mm-infrared-transmitting-led/p/ZD1945))
-* Veroboard 13x8 pins
-* [Waveshare ESP32-C3 Zero](https://www.waveshare.com/wiki/ESP32-C3-Zero)
-
-![Circuit Diagram](./ircircuit/irtx-circuit.png)
-
-![Veroboard](./ircircuit/irtx-board.png)
-
-Notes: 
-
-* the above diagram shows a jumper J1 - it's just for labelling where to solder the wires that go to the ESP32.
-* don't forget the two cut tracks indicated by red X
-* if I was to rebuild this I'd probably move the red jumper wire at the left to just to the right of the LEDs.
-* The leads to C2 need to be bent and the cap "laid down" to fit in the case (see photo below)
-* The IR LEDs leads need to be bent so they face out the left side of the diagram. (see photo below)
-* Leave the veroboard slightly oversized and file down later to fit the snap-in clips in the case.
-
-![Inner](./photos/inner.jpeg)
+* `blaster` - a simple dumb IR blaster that can be placed inconspicously at the back of a room
+  providing a way to blast IR from any Wifi enabled device.
 
 
-
-## Print the Case
-
-This case supports IR transmitter circuitry only.  A version with IR receiver is not yet available.
-
-![case](./case/case.png)
-
-The case consists of three parts:
-
-* [Top](./case/irtxcase-top.3mf)
-* [Bottom](./case/irtxcase-bottom.3mf)
-* [Clamp](./case/irtxcase-clamp.3mf)
-
-You'll need a well calibrated printer to get the boards to clip in and the case to snap closed nicely.
-
-The clamp is designed for a 15mm pole and requires:
-
-* two M2.5 heat set inserts 
-* two M2.5 6mm screws.
-
-Or, design your own clamp for whereever you want to mount it to. The mounting holds are 26mm center-to-center. 
-
-Fusion and 3mf files are the in the [./case](./case) subdirectory.
-
-I printed the case in PLA, and the clamp in PETG.  You might be able to print it in ABS but I found the board clips too fragile.
-
-
-
-## Connect the ESP32
-
-There are three wires from the ESP32 Zero to the IR transmitter circuit.  
-
-* The IR transmitter connection points are shown in the above stripboard image.
-
-* The ESP32 Zero connections are to 5V and GND at the top left and signal to GPIO 4:
-
-    ![ESP32-C3-Zero](./ircircuit/ESP32-C3-ZERO-Waveshare-pinout-high.jpg)
-
-
-
-
-## Build the Firmware
+## Building the Firmware
 
 The firmware for the esp32 is an Arduino project.  To build
 
@@ -122,12 +62,20 @@ The firmware for the esp32 is an Arduino project.  To build
     ./build --flash c3 com8
     ```
 
+Alternatively, you can build and flash in one command:
+
+```
+./build c3 com8
+```
 
 The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.  N
 
+
+
 ## Configuring the Device
 
-Use a serial monitor program to configure the device.  The following serial terminal commands are available:
+Use a serial monitor program (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure the device.  The 
+following serial terminal commands are available:
 
  *   `name <devicename>`          - set device name, takes effect after restart
  *   `setwifi <ssid> <password>`  - configure WiFi
@@ -182,11 +130,10 @@ perform operations.
 
 ## Telnet Support
 
-Once wifi is enabled and working you can also use telnet to configure and monitor the device with the
-same commands as above.
+Once wifi is enabled and working you can also use telnet (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure 
+and monitor the device with the same commands as above.
 
 Note: only one telnet client can connect at a time.
-
 
 ## Pairing BLE Devices
 
@@ -210,27 +157,6 @@ connection status.
 
 Note: BLE can be a bit flakey during pairing.  Sometimes you might need to toggle bluetooth on/off on the device being paired
 to get it to initially connect.
-
-## Notes on IR Remapping
-
-The device can receive NEC and Panasonic IR transmissions, map them to a different IR protocol/code and then either
-re-transmit locally from the same device, or send the remapped code to a second irtx device for transmission.
-
-Care needs to be taken when using this in the same room since overlapping IR codes will typically fail if a device
-receives IR transmissions from two devices at the same time.
-
-There are severak use cases for this:
-
-1. In the same room by blocking a device's IR receiver with a hood containing an IR LED connected to an irtx device.  This blocks the 
-  device from seeing IR from a remote while still allowing the irtx device to control it.
-
-    This allows IR signals to a device to be intercepted, remapped and either passed through or used for secondary functions.  
-  
-    eg: with appropriate controlling software this could be used to convert a regular DVR remote into a universal remote for a home theatre.
-
-2. Transmitting received IR codes to a separate room.
-
-3. Transmitting received IR codes to other non-irtx machine.
 
 
 
@@ -321,30 +247,134 @@ If `repeat` is non-zero and the protocol defines a repeat frame, the repeat fram
 
 
 
-### Set IR Route Table
+### Switch Activity
 
-The device can receive IR signals, look them up in a route table, and re-transmit them — either locally or forwarded to another irtx device over UDP.  The route table is set by sending a UDP packet to port 4210 in the following format:
+Switches the current activity:
 
 * `uint16_t cmd` - must be 5
-* `uint16_t count` - number of route entries that follow
-* Route entries, repeated `count` times (28 bytes each, all fields little-endian):
-  * `uint32_t srcProtocol` - protocol ID of the incoming IR code to match
-  * `uint64_t srcCode` - IR code value to match
-  * `uint32_t dstProtocol` - protocol ID to use for retransmission (0 = suppress)
-  * `uint64_t dstCode` - IR code value to retransmit
-  * `uint32_t dstIp` - destination IP address (0 = local retransmit)
+* `uint32_t activityIndex` - the index of the activity to switch to
 
-This packet **replaces the entire route table** — send `count=0` to clear all routes.
 
-The maximum number of routes is 64.
+### Simulate IR Code
 
-When an IR signal is received and decoded, its protocol and code are looked up against the table:
+Simulates the receipt of an IR code and dispatches it through the activity system:
 
-* **`dstProtocol == 0`** — suppress: the signal is silently dropped.
-* **`dstIp == 0`** — local retransmit: the device transmits `dstProtocol:dstCode` via its own IR transmitter.
-* **`dstIp != 0`** — remote forward: the device sends a cmd=4 UDP packet to the specified IP address on port 4210, which causes the remote irtx device to transmit `dstProtocol:dstCode`.
+* `uint16 cmd` - must be 6
+* `uint32 protocol` - riff encoded IR protocol
+* `uint64 code` - the IR code
+* `uint32` - the event kind  (press, release, see [irEventKindMask](./binpack.js))
 
-`dstIp` is stored little-endian with the first octet in the least-significant byte.  For example, `192.168.1.100` is encoded as `0x6401A8C0`.
+
+
+## Activities
+
+Besides acting as a dumb IR blaster, irtx can also manage a set of "activities".  
+
+The activities system supports:
+
+* A set of device definitions each with a list of operations for turning the device on and off
+* A set of activity definitions each of which defines a set of required devices (which will be turned on, 
+  others will be turned off), a set of activate and deactivate operations and a set of bindings that 
+  map input actions to a sequence of operations.
+
+A sequence of operations can include:
+
+- Send an IR code
+- Send a Wake on Lan packet
+- Make an HTTP GET or POST request
+- Send a UDP packet
+- Delay
+- Set the onboard LED
+- Switch activities
+- Search for a string in a HTTP GET response
+- Perform a conditional set of instructions depending on string match
+
+Unlike device configuration which is done via serial/telnet and stored in NVS on the device, activity
+definitions are compiled from JSON like definition into a binary packed file and uploaded to the device
+via http using the [node-irtx](https://github.com/toptensoftware/irtx-node) command line tool.
+
+eg:
+
+```
+npx toptensoftware/irtx-node configure my-activities.js
+```
+
+Here's an example activities configuration file (intended for illustration only)
+
+```js
+import { op } from "irtx:binpack";
+
+// IR Codes
+let ircodes = {
+    tvOn: "NEC:0x20dfb34c",
+    tvOff: "NEC:0x20dfa35c",
+    volumeUp: "PANA:0x400401000405",
+    volumeDown: "PANA:0x400401008485",
+    ///etc...
+}
+
+// Base URL for Yamaha receiver
+const yamaUrl = "http://10.1.1.125/YamahaExtendedControl/v1";
+
+// Main Config
+const confg = {
+    version: 1,
+    devices: [
+        { 
+            // TV Device
+            name: "tv", 
+            turnOn: op.sendIr(ircodes.tvOn),
+            turnOff: op.sendIr(ircodes.tvOff)
+        },
+        {
+            // Yamaha Receiver Device
+            name: "receiver", 
+            turnOn: op.httpGet(yamaUrl + "/main/setPower?power=on"),
+            turnOff: op.httpGet(yamaUrl + "/main/setPower?power=standby"),
+        }
+    ],
+    activities: [
+        {
+            name: "off",
+            devices: [ /* no devices, turn everything off */ ],
+        },
+        {
+            // Watch TV activity
+            name: "watchTv",
+
+            // Required devices
+            devices: [ "tv", "receiver", ],
+
+            // Actions to invoke when this activity is activated/deactivated
+            //didDeactivate: [ ],
+            didActivate: op.httpGet(yamaUrl + "/main/setInput?input=hdmi1"),
+            //willActivate: [ ],
+            //willDeactivate: [ ],
+
+            // Bindings
+            bindings: [
+                {
+                    // Volume up
+                    on: ircodes.volumeUp,
+                    do: op.httpGet(recUrl +"/main/setVolume?volume=up"),
+                },
+                {
+                    // Volume down
+                    on: ircodes.volumeDown,
+                    do: op.httpGet(recUrl +"/main/setVolume?volume=down"),
+                },
+            ]
+        },
+        {
+            // Activity 2 etc...
+        }
+    ]
+}
+
+// The root configuration must be the default export
+export default config;
+
+```
 
 
 
