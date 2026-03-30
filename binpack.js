@@ -103,6 +103,14 @@ export class op
         }
     }
 
+    static httpPost(url)
+    {
+        return {
+            op: opId.http_get,
+            url,
+        }
+    }
+
     static sendWol(macaddr)
     {
         return {
@@ -124,6 +132,119 @@ export class op
             ipAddr: parseIPv4(ipAddr),
         }
     }
+
+    static delay(ms)
+    {
+        return {
+            op: opId.delay,
+            duration: ms,
+        }
+    }
+
+    static switchActivity(indexOrName)
+    {
+        return {
+            op: opId.switch_activity,
+            index: indexOrName,
+        }
+    }
+
+    static wait_http()
+    {
+        return {
+            type: opId.wait_http,
+        }
+    }
+
+    static led(color)
+    {
+        return {
+            type: opId.led,
+            color: color,
+        }
+    }
+
+    static udp(ip, data)
+    {
+        return {
+            type: opId.udp_packet,
+            ipAddr: parseIPv4(ip),
+            data: data,
+        }
+    }
+
+    static match_string(str)
+    {
+        return {
+            type: opId.search_string,
+            matchString: str,
+        }
+    }
+
+    static if_true(trueOps, falseOps)
+    {
+        return {
+            type: opId.if_true,
+            trueOps,
+            falseOps,
+        }
+    }
+}
+
+export class binding
+{
+    static ir(code)
+    {
+        // Wildcard
+        if (code == "*")
+        {
+            return { 
+                type: bindingType.ir_any,
+            }
+        }
+
+        // <protocol>:<modifier>+<ircode>
+        let m = code.match(/^([A-Z0-9]+):(?:0x)?(?:([a-fA-F0-9]+)\+)?(?:0x)?([a-fA-F0-9]+)?/);
+        if (!m)
+            throw new Error(`invalid ir code '${code}`);
+
+        // Create default binding
+        let binding = {
+            type: bindingType.ir,
+            protocol: riff(m[1]),
+            modifier: m[2] ? BigInt("0x" + m[2]) : undefined,
+            value: BigInt("0x" + m[3]),
+        }
+
+        return Object.assign(binding);
+    }
+
+    static gpio(pin)
+    {
+        return {
+            type: bindingType.gpio,
+            pin: pin,
+        }
+    }
+
+    static encoder_inc(pin)
+    {
+        return {
+            type: bindingType.gpio_encoder,
+            pin: pin,
+            direction: 1,
+        }
+    }
+
+    static encoder_dec(pin)
+    {
+        return {
+            type: bindingType.gpio_encoder,
+            pin: pin,
+            direction: 1,
+        }
+    }
+    
 }
 
 function makeArray(value)
@@ -212,20 +333,6 @@ let types = [
 
 {
     name: "op",
-    packMapper: (value) => {
-        if (typeof value == "string")
-        {
-            if (value === "*")
-                return { op: opId.send_ir, protocol: 0, irCode: 0n }
-            if (value.startsWith("http://"))
-                return { op: opId.http_get, url: value }
-
-            let m = value.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
-            return { op: opId.send_ir, protocol: riff(m[1]), irCode: BigInt("0x" + m[2])}
-
-        }
-        return value;
-    },
     resolveVirtualType: (val) => {
         switch (val.op)
         {
@@ -371,55 +478,15 @@ let types = [
     name: "binding",
     packMapper: (value) => {
 
-        // Map string args
+        // Map binding factory
         value = Object.assign({}, value);
-        if (value.on)
+        if (typeof(value.on) === "object")
         {
-            if (value.on === "*")
-            {
-                // Any IR Code
-                value = { type: bindingType.ir_any , ...value };
-            }
-            else if (value.on.startsWith("gpio:"))
-            {
-                // gpio:<pin>
-                value.type = bindingType.gpio;
-                value.pin = parseInt(value.on.slice(5));
-            }
-            else if (value.on.startsWith("encoder:"))
-            {
-                // encoder:<pin>[:<+|->]
-                let parts = value.on.slice(8).split(":");
-                value.type = bindingType.gpio_encoder;
-                value.pin = parseInt(parts[0]);
-                if (parts[1] === "+")      value.direction = 1;
-                else if (parts[1] === "-") value.direction = -1;
-                // direction defaults to 0 (any) if not specified
-            }
-            else
-            {
-                // <protocol>:<modifier>+<ircode>
-                let m = value.on.match(/^([A-Z0-9]+):(?:0x)?(?:([a-fA-F0-9]+)\+)?(?:0x)?([a-fA-F0-9]+)?/);
-                value.type = bindingType.ir;
-                value.protocol = riff(m[1]);
-                if (m[2])
-                    value.modifier = BigInt("0x" + m[2]);
-                value.value = BigInt("0x" + m[3]);
-            }
-
+            Object.assign(value, value.on);
             delete value.on;
         }
 
-        // Crack protocol:ircode modifier from string
-        if (typeof value.modifier === 'string')
-        {
-            let m = value.modifier.match(/^([A-Z0-9]+):(?:0x)?([a-fA-F0-9]+)?/);
-            let modifierProtocol = riff(m[1]);
-            if (value.protocol && value.protocol != modifierProtocol)
-                throw new Error(`Modifier has mismatched protocol ${value.protocol} != ${modifierProtocol}`);
-            value.modifier = BigInt("0x" + m[2]);
-        }
-
+        // Map do actions
         value.do = makeArray(value.do);
         return value;
     },
