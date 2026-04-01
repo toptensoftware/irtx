@@ -87,6 +87,7 @@ following serial terminal commands are available:
  *   `connect <bleslot>`                  - connect to the paired device for a slot
  *   `led <r> <g> <b>` / `led clear`     - set or clear the user LED colour
  *   `activity <name|index>`              - switch to an activity by name or index
+ *   `setdefact <index>`                  - set the default activity loaded on boot (default: 0)
  *   `gpio [<pin> [<pin>] <mode>]`        - show or configure GPIO pins
  *   `verbose on|off`                     - enable or disable verbose logging (persisted across reboots)
  *   `nvsreset`                           - factory reset
