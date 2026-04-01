@@ -15,6 +15,12 @@ void logWriteRaw(const char* buf, size_t len);
 // Print the last 50 log lines (ring buffer).
 void dmesgPrint();
 
+// Capture all output to a String for the duration of a synchronous operation.
+// Call logStartCapture() before, logEndCapture() after; output still goes to
+// Serial/telnet as normal.
+void logStartCapture(String* buf);
+void logEndCapture();
+
 // Called by telnet.cpp when a client connects or disconnects.
 void logSetTelnetFd(int fd);
 

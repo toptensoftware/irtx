@@ -3,6 +3,13 @@
 #include <stdarg.h>
 #include "log.h"
 
+// ---- Capture buffer ----
+
+static String* captureBuffer = nullptr;
+
+void logStartCapture(String* buf) { captureBuffer = buf; }
+void logEndCapture()              { captureBuffer = nullptr; }
+
 // ---- Telnet fan-out ----
 
 static int telnetFd = -1;
@@ -70,6 +77,9 @@ void dmesgPrint()
 
 void logWriteRaw(const char* buf, size_t len)
 {
+    if (captureBuffer)
+        captureBuffer->concat(buf, (unsigned int)len);
+
     Serial.write((const uint8_t*)buf, len);
 
     if (telnetFd < 0) return;

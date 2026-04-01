@@ -6,6 +6,8 @@
 #include "activities.h"
 #include "http.h"
 #include "web_files.h"
+#include "serial.h"
+#include "log.h"
 
 static WebServer server(80);
 
@@ -66,6 +68,22 @@ static void handleActivitiesUpload()
     }
 }
 
+static void handlePostCommand()
+{
+    String cmd = server.arg("plain");
+    cmd.trim();
+    if (cmd.length() == 0)
+    {
+        server.send(400, "text/plain", "No command\n");
+        return;
+    }
+    String output;
+    logStartCapture(&output);
+    handleCommand(cmd.c_str());
+    logEndCapture();
+    server.send(200, "text/plain", output);
+}
+
 static void handlePostActivities()
 {
     server.send(200, "text/plain", "OK");
@@ -80,6 +98,7 @@ void setupHttp()
 
     const char *collectHeaderKeys[] = { "Content-Length" };
     server.collectHeaders(collectHeaderKeys, 1);
+    server.on("/command", HTTP_POST, handlePostCommand);
     server.on("/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
     server.onNotFound(handleWebFile);
 
