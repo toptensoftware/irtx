@@ -54,7 +54,7 @@ static void handlePostActivities()
 
 void setupHttp()
 {
-    if (WiFi.status() != WL_CONNECTED)
+    if (WiFi.status() != WL_CONNECTED && WiFi.getMode() != WIFI_AP)
         return;
 
     const char *collectHeaderKeys[] = { "Content-Length" };
@@ -70,7 +70,7 @@ void setupHttp()
 
 void pollHttp()
 {
-    if (WiFi.status() != WL_CONNECTED)
+    if (WiFi.status() != WL_CONNECTED && WiFi.getMode() != WIFI_AP)
         return;
 
     server.handleClient();

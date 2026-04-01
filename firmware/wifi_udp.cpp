@@ -99,23 +99,22 @@ void handleUdpPacket(uint8_t* data, int length)
 // ---- UDP Poll (called from loop) ----
 void pollWifi()
 {
-    // Skip reconnect logic when intentionally in AP mode
-    if (WiFi.getMode() == WIFI_AP)
-        return;
-
-    // WiFi reconnect
-    if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED)
+    if (WiFi.getMode() != WIFI_AP)
     {
-        setLed(LED_PRIORITY_CONNECTIVITY, 0x040200);
-        LOG("WiFi disconnected, reconnecting...\n");
-        WiFi.reconnect();
-        while (WiFi.status() != WL_CONNECTED) delay(500);
-        LOG("Reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
-        setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);
-    }
+        // STA mode: handle reconnect
+        if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED)
+        {
+            setLed(LED_PRIORITY_CONNECTIVITY, 0x040200);
+            LOG("WiFi disconnected, reconnecting...\n");
+            WiFi.reconnect();
+            while (WiFi.status() != WL_CONNECTED) delay(500);
+            LOG("Reconnected! IP: %s\n", WiFi.localIP().toString().c_str());
+            setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);
+        }
 
-    if (WiFi.status() != WL_CONNECTED)
-        return;
+        if (WiFi.status() != WL_CONNECTED)
+            return;
+    }
 
     int packetSize = udp.parsePacket();
     if (packetSize >= 2)
@@ -182,6 +181,7 @@ void startAccessPoint()
     WiFi.disconnect(true);
     WiFi.mode(WIFI_AP);
     WiFi.softAP(apSsid.c_str(), apPass.c_str());
+    udp.begin(UDP_PORT);
     LOG("Access point started. IP: %s\n", WiFi.softAPIP().toString().c_str());
 }
 
