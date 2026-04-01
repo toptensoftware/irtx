@@ -248,6 +248,28 @@ void handleCommand(const char* line)
         delay(500);
         esp_restart();
     }
+    else if (strcmp(line, "help") == 0)
+    {
+        PRINT("Commands:\n");
+        PRINT("  setwifi <ssid> <password>              Save WiFi credentials and reconnect\n");
+        PRINT("  setap <ssid> [<password>]              Save AP credentials (default pw: irtx)\n");
+        PRINT("  name <devicename>                      Set device name (restart to apply)\n");
+        PRINT("  activity <name|index>                  Switch to activity by name or index\n");
+        PRINT("  gpio [<pin> [<pin>] <mode>]            Show or set GPIO pin mode\n");
+        PRINT("    modes: grb, rgb, irrx, irtx, pullup, pulldown\n");
+        PRINT("  led <r> <g> <b>                        Set LED colour\n");
+        PRINT("  led clear                              Clear user LED override\n");
+        PRINT("  pair <index>                           Pair BLE device at index\n");
+        PRINT("  unpair <index>                         Unpair BLE device at index\n");
+        PRINT("  connect <index>                        Connect to paired BLE device\n");
+        PRINT("  verbose on|off                         Enable or disable verbose logging\n");
+        PRINT("  status                                 Show full device status\n");
+        PRINT("  dmesg                                  Print boot log\n");
+        PRINT("  nvsdump                                Dump NVS storage contents\n");
+        PRINT("  nvsreset                               Reset all NVS storage\n");
+        PRINT("  reboot                                 Restart the device\n");
+        PRINT("  help                                   Show this help\n");
+    }
     else if (*line == '\0')
     {
         // ignore empty line
