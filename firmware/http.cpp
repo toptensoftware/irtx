@@ -5,6 +5,7 @@
 #include "config.h"
 #include "activities.h"
 #include "http.h"
+#include "web_files.h"
 
 static WebServer server(80);
 
@@ -13,6 +14,26 @@ static WebServer server(80);
 static void handleNotFound()
 {
     server.send(404, "text/plain", "Not found");
+}
+
+static void handleWebFile()
+{
+    String path = server.uri();
+    if (path == "/")
+        path = "/index.html";
+
+    for (int i = 0; i < web_files_count; i++)
+    {
+        if (path == web_files[i].path)
+        {
+            server.sendHeader("Content-Encoding", "gzip");
+            server.send_P(200, web_files[i].content_type,
+                          (const char*)web_files[i].data,
+                          web_files[i].size);
+            return;
+        }
+    }
+    handleNotFound();
 }
 
 static File uploadFile;
@@ -60,7 +81,7 @@ void setupHttp()
     const char *collectHeaderKeys[] = { "Content-Length" };
     server.collectHeaders(collectHeaderKeys, 1);
     server.on("/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
-    server.onNotFound(handleNotFound);
+    server.onNotFound(handleWebFile);
 
     server.begin();
     LOG("HTTP server listening on port 80\n");
