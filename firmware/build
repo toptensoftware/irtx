@@ -43,18 +43,21 @@ case "$BOARD" in
   c6) FQBN=esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=huge_app ;;
 esac
 
+OUTPUT_DIR=../build/$BOARD
+mkdir -p $OUTPUT_DIR
+
 if $DO_BUILD; then
   (cd .. && node pack-web.js)
   CLEAN_FLAG=""
   $DO_CLEAN && CLEAN_FLAG="--clean"
   VERBOSE_FLAG=""
   $DO_VERBOSE && VERBOSE_FLAG="--verbose"
-  arduino-cli compile --fqbn $FQBN $CLEAN_FLAG $VERBOSE_FLAG .
+  arduino-cli compile --fqbn $FQBN --build-path $OUTPUT_DIR $CLEAN_FLAG $VERBOSE_FLAG .
 fi
 
 if $DO_FLASH; then
   if [ -z "$PORT" ]; then echo "Error: port required for flash"; exit 1; fi
-  arduino-cli upload --fqbn $FQBN --port $PORT .
+  arduino-cli upload --fqbn $FQBN --build-path $OUTPUT_DIR --port $PORT .
 fi
 
 
