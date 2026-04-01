@@ -542,14 +542,14 @@ void handleBleHidPacket(uint8_t* data, int length)
     uint8_t* reportData = data + 4;
     int      reportLen  = length - 4;
 
-    // Check index
-    if (bleDevIdx >= MAX_BLE_DEVICES) {
+    // Check index — 0xFF means "whatever is connected"
+    if (bleDevIdx != 0xFF && bleDevIdx >= MAX_BLE_DEVICES) {
         LOG("HID: device index out of range\n");
         return;
     }
 
     // Only deliver to the currently pre-connected (desired) device
-    if ((int)bleDevIdx != activeSlot) {
+    if (bleDevIdx != 0xFF && (int)bleDevIdx != activeSlot) {
         LOG("HID: packet for device %i dropped, currently connected to slot %i\n",
             (int)bleDevIdx, (int)activeSlot);
         return;
