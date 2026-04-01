@@ -113,33 +113,38 @@ void setupGpioConfig()
         gpioIrTxPin, gpioIrRxPin, gpioLedPin, gpioPullupCount, gpioPulldownCount);
 }
 
-static void printSlots(GpioPinSlot* slots, uint8_t count)
+static void printJsonPinArray(GpioPinSlot* slots, uint8_t count)
 {
-    if (count == 0) { PRINT(" (none)"); return; }
+    PRINT("[");
     for (int i = 0; i < count; i++)
     {
+        if (i > 0) PRINT(", ");
         if (slots[i].pinB == GPIO_PIN_NONE)
-            PRINT(" %d", slots[i].pinA);
+            PRINT("%d", slots[i].pinA);
         else
-            PRINT(" %d+%d", slots[i].pinA, slots[i].pinB);
+            PRINT("[%d, %d]", slots[i].pinA, slots[i].pinB);
     }
+    PRINT("]");
 }
 
 void statusGpioConfig()
 {
-    PRINT("IR TX pin: %d\n", gpioIrTxPin);
-    PRINT("IR RX pin: %d\n", gpioIrRxPin);
-    PRINT("LED pin:   %d (%s)\n", gpioLedPin,
-          gpioLedPin < 0 ? "disabled" :
-          gpioLedOrder == GPIO_LED_ORDER_GRB ? "grb" : "rgb");
-
-    PRINT("Pullup slots (%d):", gpioPullupCount);
-    printSlots(gpioPullupSlots, gpioPullupCount);
-    PRINT("\n");
-
-    PRINT("Pulldown slots (%d):", gpioPulldownCount);
-    printSlots(gpioPulldownSlots, gpioPulldownCount);
-    PRINT("\n");
+    PRINT("  \"gpio\": {\n");
+    PRINT("    \"irtx_pin\": %d,\n", gpioIrTxPin);
+    PRINT("    \"irrx_pin\": %d,\n", gpioIrRxPin);
+    if (gpioLedPin < 0)
+    {
+        PRINT("    \"led_pin\": null,\n");
+        PRINT("    \"led_order\": null,\n");
+    }
+    else
+    {
+        PRINT("    \"led_pin\": %d,\n", gpioLedPin);
+        PRINT("    \"led_order\": \"%s\",\n", gpioLedOrder == GPIO_LED_ORDER_GRB ? "grb" : "rgb");
+    }
+    PRINT("    \"pullup\": "); printJsonPinArray(gpioPullupSlots, gpioPullupCount); PRINT(",\n");
+    PRINT("    \"pulldown\": "); printJsonPinArray(gpioPulldownSlots, gpioPulldownCount); PRINT("\n");
+    PRINT("  },\n");
 }
 
 void gpioSetPin(int pinA, int pinB, const char* func)

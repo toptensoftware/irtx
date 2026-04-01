@@ -188,36 +188,35 @@ void startAccessPoint()
 
 void statusWifi()
 {
-    PRINT("--- WiFi ---\n");
+    PRINT("  \"wifi\": {\n");
     if (WiFi.getMode() == WIFI_AP)
     {
         prefs.begin("ap", true);
         String apSsid = prefs.getString("ssid", deviceName);
         prefs.end();
-        PRINT("Mode        : AP\n");
-        PRINT("AP SSID     : %s\n", apSsid.c_str());
-        PRINT("AP IP       : %s\n", WiFi.softAPIP().toString().c_str());
+        PRINT("    \"mode\": \"ap\",\n");
+        PRINT("    \"ssid\": "); printJsonString(apSsid.c_str()); PRINT(",\n");
+        PRINT("    \"ip\": \"%s\",\n", WiFi.softAPIP().toString().c_str());
     }
     else
     {
         prefs.begin("wifi", true);
-        String ssid = prefs.getString("ssid", "(not set)");
+        String ssid = prefs.getString("ssid", "");
         prefs.end();
-        PRINT("SSID        : %s\n", ssid.c_str());
+        PRINT("    \"mode\": \"sta\",\n");
+        PRINT("    \"ssid\": "); printJsonString(ssid.c_str()); PRINT(",\n");
+        PRINT("    \"connected\": %s,\n", WiFi.status() == WL_CONNECTED ? "true" : "false");
         if (WiFi.status() == WL_CONNECTED)
         {
-            PRINT("IP address  : %s\n", WiFi.localIP().toString().c_str());
-            PRINT("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
-            PRINT("RSSI        : %d dBm\n", WiFi.RSSI());
-        }
-        else
-        {
-            PRINT("Status      : disconnected\n");
+            PRINT("    \"ip\": \"%s\",\n", WiFi.localIP().toString().c_str());
+            PRINT("    \"gateway\": \"%s\",\n", WiFi.gatewayIP().toString().c_str());
+            PRINT("    \"rssi\": %d,\n", WiFi.RSSI());
         }
     }
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    PRINT("MAC (WiFi)  : %02X:%02X:%02X:%02X:%02X:%02X\n",
+    PRINT("    \"mac\": \"%02X:%02X:%02X:%02X:%02X:%02X\",\n",
                     mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
-    PRINT("UDP port    : %d\n", UDP_PORT);
+    PRINT("    \"udp_port\": %d\n", UDP_PORT);
+    PRINT("  },\n");
 }

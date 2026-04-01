@@ -23,7 +23,8 @@ void setupDeviceName()
 
 void statusDeviceName()
 {
-    PRINT("--- Device ---\n");
-    PRINT("Name        : %s\n", deviceName);
-    PRINT("Logging     : %s\n", logGetVerbose() ? "verbose" : "standard");
+    PRINT("  \"device\": {\n");
+    PRINT("    \"name\": "); printJsonString(deviceName); PRINT(",\n");
+    PRINT("    \"logging\": \"%s\"\n", logGetVerbose() ? "verbose" : "standard");
+    PRINT("  },\n");
 }

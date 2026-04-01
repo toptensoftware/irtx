@@ -73,10 +73,13 @@ const IrProtocol* getIrProtocolByIndex(int index)
 
 void statusProtocols()
 {
-    PRINT("--- IR protocols (%d) ---\n", registeredProtocolCount);
+    PRINT("  \"protocols\": [\n");
     for (int i = 0; i < registeredProtocolCount; i++)
     {
         const IrProtocol* p = registeredProtocols[i];
-        PRINT("  %-8s  : id: 0x%08X bits: %d\n", p->name, p->id, p->bitCount);
+        PRINT("    { \"name\": \"%s\", \"id\": \"0x%08X\", \"bits\": %d }%s\n",
+              p->name, p->id, p->bitCount,
+              i < registeredProtocolCount - 1 ? "," : "");
     }
+    PRINT("  ],\n");
 }

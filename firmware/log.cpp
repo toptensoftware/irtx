@@ -3,6 +3,33 @@
 #include <stdarg.h>
 #include "log.h"
 
+// ---- JSON string helper ----
+
+void printJsonString(const char* s)
+{
+    char buf[512];
+    int  pos = 0;
+    buf[pos++] = '"';
+    for (; *s && pos < (int)sizeof(buf) - 8; s++)
+    {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  { buf[pos++] = '\\'; buf[pos++] = '"';  }
+        else if (c == '\\') { buf[pos++] = '\\'; buf[pos++] = '\\'; }
+        else if (c < 0x20)  { pos += snprintf(buf + pos, 8, "\\u%04X", c); }
+        else                { buf[pos++] = (char)c; }
+    }
+    buf[pos++] = '"';
+    buf[pos]   = '\0';
+    printWrite("%s", buf);
+}
+
+// ---- Capture buffer ----
+
+static String* captureBuffer = nullptr;
+
+void logStartCapture(String* buf) { captureBuffer = buf; }
+void logEndCapture()              { captureBuffer = nullptr; }
+
 // ---- Telnet fan-out ----
 
 static int telnetFd = -1;
@@ -56,13 +83,9 @@ void dmesgPrint()
     for (int i = 0; i < count; i++)
     {
         const char* line = dmesgRing[(start + i) % DMESG_LINES];
-        // Write directly to outputs, bypassing dmesgFeed to avoid re-storing replayed lines
-        Serial.println(line);
-        if (telnetFd >= 0)
-        {
-            send(telnetFd, line, strlen(line), MSG_DONTWAIT);
-            send(telnetFd, "\r\n", 2, MSG_DONTWAIT);
-        }
+        // Use logWriteRaw (not logWrite) to avoid re-storing replayed lines in dmesgFeed
+        logWriteRaw(line, strlen(line));
+        logWriteRaw("\n", 1);
     }
 }
 
@@ -70,6 +93,9 @@ void dmesgPrint()
 
 void logWriteRaw(const char* buf, size_t len)
 {
+    if (captureBuffer)
+        captureBuffer->concat(buf, (unsigned int)len);
+
     Serial.write((const uint8_t*)buf, len);
 
     if (telnetFd < 0) return;

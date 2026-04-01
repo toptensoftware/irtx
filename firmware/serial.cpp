@@ -238,12 +238,14 @@ void handleCommand(const char* line)
     }
     else if (strcmp(line, "status") == 0)
     {
+        PRINT("{\n");
         statusDeviceName();
         statusGpioConfig();
         statusProtocols();
         statusWifi();
         statusBle();
         statusActivities();
+        PRINT("}\n");
     }
     else if (strcmp(line, "dmesg") == 0)
     {
