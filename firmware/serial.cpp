@@ -69,10 +69,11 @@ void handleCommand(const char* line)
         char password[256];
         if (passLen == 0)
         {
-            strcpy(password, "irtx");
+            strcpy(password, "irtx1234");
         }
         else
         {
+            if (passLen < 8) { LOG("Error: AP password must be at least 8 characters\n"); return; }
             passLen = min(passLen, 255);
             memcpy(password, p, passLen); password[passLen] = '\0';
         }
@@ -291,7 +292,7 @@ void handleCommand(const char* line)
     {
         PRINT("Commands:\n");
         PRINT("  setwifi <ssid> <password>              Save WiFi credentials and reconnect\n");
-        PRINT("  setap <ssid> [<password>]              Save AP credentials (default pw: irtx)\n");
+        PRINT("  setap <ssid> [<password>]              Save AP credentials (pw must be 8+ chars, default: irtx1234)\n");
         PRINT("  setbootpin <pin> [<pin>]               Pin(s) that trigger AP mode at boot\n");
         PRINT("  name <devicename>                      Set device name (restart to apply)\n");
         PRINT("  activity <name|index>                  Switch to activity by name or index\n");
