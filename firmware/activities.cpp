@@ -941,13 +941,23 @@ static bool loadActivities()
     return true;
 }
 
-// ---- Activate the initial (index 0) activity on boot ----
+// ---- Activate the default activity on boot ----
 static void activateInitial()
 {
     if (!activitiesConfig || activitiesConfig->activities_count == 0) return;
 
-    s_currentActivity = 0;
-    activity* act = &activitiesConfig->activities[0];
+    prefs.begin("device", true);
+    int defact = prefs.getInt("defact", 0);
+    prefs.end();
+
+    if (defact < 0 || (uint32_t)defact >= activitiesConfig->activities_count)
+    {
+        LOG("Activities: default activity %d out of range, using 0\n", defact);
+        defact = 0;
+    }
+
+    s_currentActivity = defact;
+    activity* act = &activitiesConfig->activities[defact];
 
     enqueueOps(act->willActivate, act->willActivate_count);
 

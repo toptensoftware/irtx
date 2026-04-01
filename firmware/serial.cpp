@@ -109,6 +109,19 @@ void handleCommand(const char* line)
             LOG("Boot AP pin set to %ld\n", pin1);
 
     }
+    else if (strncmp(line, "setdefact ", 10) == 0)
+    {
+        const char* p = line + 10;
+        while (*p == ' ') p++;
+        char* end;
+        long idx = strtol(p, &end, 10);
+        if (end == p || idx < 0) { LOG("Usage: setdefact <index>\n"); return; }
+        prefs.begin("device", false);
+        prefs.putInt("defact", (int)idx);
+        prefs.end();
+        LOG("Default activity set to %ld\n", idx);
+
+    }
     else if (strncmp(line, "name ", 5) == 0)
     {
         const char* p = line + 5;
@@ -282,6 +295,7 @@ void handleCommand(const char* line)
         PRINT("  setbootpin <pin> [<pin>]               Pin(s) that trigger AP mode at boot\n");
         PRINT("  name <devicename>                      Set device name (restart to apply)\n");
         PRINT("  activity <name|index>                  Switch to activity by name or index\n");
+        PRINT("  setdefact <index>                      Set default activity loaded on boot\n");
         PRINT("  gpio [<pin> [<pin>] <mode>]            Show or set GPIO pin mode\n");
         PRINT("    modes: grb, rgb, irrx, irtx, pullup, pulldown\n");
         PRINT("  led <r> <g> <b>                        Set LED colour\n");
