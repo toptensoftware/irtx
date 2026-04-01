@@ -368,34 +368,33 @@ void pollBle()
 
 void statusBle()
 {
-    PRINT("--- BLE ---\n");
-
+    PRINT("  \"ble\": [\n");
     for (int i = 0; i < MAX_BLE_DEVICES; i++)
     {
         ble_addr_t mac;
         generate_slot_address(i, &mac);
-
-        PRINT("Slot %d      : id: %02X:%02X:%02X:%02X:%02X:%02X",
-                i, mac.val[5], mac.val[4], mac.val[3], mac.val[2], mac.val[1], mac.val[0]);
+        PRINT("    { \"slot\": %d, \"id\": \"%02X:%02X:%02X:%02X:%02X:%02X\"",
+              i, mac.val[5], mac.val[4], mac.val[3], mac.val[2], mac.val[1], mac.val[0]);
 
         NimBLEAddress addr;
         if (loadPeerAddress(i, addr))
         {
             auto val = addr.getVal();
-            PRINT("  peer: %02X:%02X:%02X:%02X:%02X:%02X",
-                 val[5], val[4], val[3], val[2], val[1], val[0]);
+            PRINT(", \"peer\": \"%02X:%02X:%02X:%02X:%02X:%02X\"",
+                  val[5], val[4], val[3], val[2], val[1], val[0]);
         }
 
         if (i == activeSlot)
         {
             if (bleServer->getConnectedCount() > 0)
-                PRINT(" Connected");
+                PRINT(", \"status\": \"connected\"");
             else if (NimBLEDevice::getAdvertising()->isAdvertising())
-                PRINT(" Advertising");
+                PRINT(", \"status\": \"advertising\"");
         }
 
-        PRINT("\n");
+        PRINT(" }%s\n", i < MAX_BLE_DEVICES - 1 ? "," : "");
     }
+    PRINT("  ],\n");
 }
 
 

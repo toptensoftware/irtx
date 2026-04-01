@@ -862,27 +862,36 @@ void invokeBindings(uint32_t protocol, uint64_t value, IrEventKind kind)
 // ---- Status ----
 void statusActivities()
 {
-    PRINT("--- Activities ---\n");
+    PRINT("  \"activities\": {\n");
     if (!activitiesConfig)
     {
-        PRINT("  no config loaded\n");
+        PRINT("    \"error\": \"no config loaded\"\n");
+        PRINT("  }\n");
         return;
     }
-    PRINT("  devices (%d):\n", (int)activitiesConfig->devices_count);
+    PRINT("    \"devices\": [\n");
     for (uint32_t i = 0; i < activitiesConfig->devices_count; i++)
     {
         bool on = (s_deviceOnMask & (1u << i)) != 0;
-        PRINT("    [%d] %s (%s)\n", (int)i,
-              activitiesConfig->devices[i].name, on ? "on" : "off");
+        PRINT("      { \"index\": %d, \"name\": ", (int)i);
+        printJsonString(activitiesConfig->devices[i].name);
+        PRINT(", \"on\": %s }%s\n",
+              on ? "true" : "false",
+              i < activitiesConfig->devices_count - 1 ? "," : "");
     }
-    PRINT("  activities (%d):\n", (int)activitiesConfig->activities_count);
+    PRINT("    ],\n");
+    PRINT("    \"list\": [\n");
     for (uint32_t i = 0; i < activitiesConfig->activities_count; i++)
     {
-        PRINT("    [%d] %s%s\n", (int)i,
-              activitiesConfig->activities[i].name,
-              (int)i == s_currentActivity ? " *" : "");
+        PRINT("      { \"index\": %d, \"name\": ", (int)i);
+        printJsonString(activitiesConfig->activities[i].name);
+        PRINT(", \"active\": %s }%s\n",
+              (int)i == s_currentActivity ? "true" : "false",
+              i < activitiesConfig->activities_count - 1 ? "," : "");
     }
-    PRINT("  queue: %s\n", isQueueEmpty() ? "empty" : "busy");
+    PRINT("    ],\n");
+    PRINT("    \"queue\": \"%s\"\n", isQueueEmpty() ? "empty" : "busy");
+    PRINT("  }\n");
 }
 
 // ---- BPAK loader ----

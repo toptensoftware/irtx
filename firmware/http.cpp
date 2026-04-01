@@ -68,6 +68,15 @@ static void handleActivitiesUpload()
     }
 }
 
+static void handleGetStatus()
+{
+    String output;
+    logStartCapture(&output);
+    handleCommand("status");
+    logEndCapture();
+    server.send(200, "application/json", output);
+}
+
 static void handleGetDmesg()
 {
     String output;
@@ -107,6 +116,7 @@ void setupHttp()
 
     const char *collectHeaderKeys[] = { "Content-Length" };
     server.collectHeaders(collectHeaderKeys, 1);
+    server.on("/status", HTTP_GET, handleGetStatus);
     server.on("/dmesg", HTTP_GET, handleGetDmesg);
     server.on("/command", HTTP_POST, handlePostCommand);
     server.on("/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);

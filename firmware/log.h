@@ -15,6 +15,9 @@ void logWriteRaw(const char* buf, size_t len);
 // Print the last 50 log lines (ring buffer).
 void dmesgPrint();
 
+// Print a JSON-escaped, double-quoted string value via printWrite.
+void printJsonString(const char* s);
+
 // Capture all output to a String for the duration of a synchronous operation.
 // Call logStartCapture() before, logEndCapture() after; output still goes to
 // Serial/telnet as normal.

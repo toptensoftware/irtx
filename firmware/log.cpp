@@ -3,6 +3,26 @@
 #include <stdarg.h>
 #include "log.h"
 
+// ---- JSON string helper ----
+
+void printJsonString(const char* s)
+{
+    char buf[512];
+    int  pos = 0;
+    buf[pos++] = '"';
+    for (; *s && pos < (int)sizeof(buf) - 8; s++)
+    {
+        unsigned char c = (unsigned char)*s;
+        if      (c == '"')  { buf[pos++] = '\\'; buf[pos++] = '"';  }
+        else if (c == '\\') { buf[pos++] = '\\'; buf[pos++] = '\\'; }
+        else if (c < 0x20)  { pos += snprintf(buf + pos, 8, "\\u%04X", c); }
+        else                { buf[pos++] = (char)c; }
+    }
+    buf[pos++] = '"';
+    buf[pos]   = '\0';
+    printWrite("%s", buf);
+}
+
 // ---- Capture buffer ----
 
 static String* captureBuffer = nullptr;
