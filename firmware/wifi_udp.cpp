@@ -98,6 +98,10 @@ void handleUdpPacket(uint8_t* data, int length)
 // ---- UDP Poll (called from loop) ----
 void pollWifi()
 {
+    // Skip reconnect logic when intentionally in AP mode
+    if (WiFi.getMode() == WIFI_AP)
+        return;
+
     // WiFi reconnect
     if (WiFi.getMode() != WIFI_OFF && WiFi.status() != WL_CONNECTED)
     {
@@ -109,10 +113,9 @@ void pollWifi()
         setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);
     }
 
-
-    if (WiFi.status() != WL_CONNECTED) 
+    if (WiFi.status() != WL_CONNECTED)
         return;
-        
+
     int packetSize = udp.parsePacket();
     if (packetSize >= 2)
     {
@@ -125,23 +128,51 @@ void pollWifi()
     }
 }
 
+// ---- Switch to Access Point mode ----
+void startAccessPoint()
+{
+    prefs.begin("ap", true);
+    String apSsid = prefs.getString("ssid", deviceName);
+    String apPass = prefs.getString("password", "irtx");
+    prefs.end();
+
+    LOG("Switching to access point mode: %s\n", apSsid.c_str());
+    udp.stop();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(apSsid.c_str(), apPass.c_str());
+    LOG("Access point started. IP: %s\n", WiFi.softAPIP().toString().c_str());
+}
+
 
 void statusWifi()
 {
     PRINT("--- WiFi ---\n");
-    prefs.begin("wifi", true);
-    String ssid = prefs.getString("ssid", "(not set)");
-    prefs.end();
-    PRINT("SSID        : %s\n", ssid.c_str());
-    if (WiFi.status() == WL_CONNECTED)
+    if (WiFi.getMode() == WIFI_AP)
     {
-        PRINT("IP address  : %s\n", WiFi.localIP().toString().c_str());
-        PRINT("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
-        PRINT("RSSI        : %d dBm\n", WiFi.RSSI());
+        prefs.begin("ap", true);
+        String apSsid = prefs.getString("ssid", deviceName);
+        prefs.end();
+        PRINT("Mode        : AP\n");
+        PRINT("AP SSID     : %s\n", apSsid.c_str());
+        PRINT("AP IP       : %s\n", WiFi.softAPIP().toString().c_str());
     }
     else
     {
-        PRINT("Status      : disconnected\n");
+        prefs.begin("wifi", true);
+        String ssid = prefs.getString("ssid", "(not set)");
+        prefs.end();
+        PRINT("SSID        : %s\n", ssid.c_str());
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            PRINT("IP address  : %s\n", WiFi.localIP().toString().c_str());
+            PRINT("Gateway     : %s\n", WiFi.gatewayIP().toString().c_str());
+            PRINT("RSSI        : %d dBm\n", WiFi.RSSI());
+        }
+        else
+        {
+            PRINT("Status      : disconnected\n");
+        }
     }
     uint8_t mac[6];
     esp_read_mac(mac, ESP_MAC_WIFI_STA);

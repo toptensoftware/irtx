@@ -7,3 +7,4 @@ extern WiFiUDP udp;
 void setupWifi();
 void pollWifi();
 void statusWifi();
+void startAccessPoint();

@@ -52,6 +52,37 @@ void handleCommand(const char* line)
         }
 
     }
+    else if (strncmp(line, "setap ", 6) == 0)
+    {
+        const char* p = line + 6;
+        while (*p == ' ') p++;
+        const char* ssidStart = p;
+        while (*p && *p != ' ') p++;
+        int ssidLen = p - ssidStart;
+        if (ssidLen == 0) { LOG("Usage: setap <ssid> [<password>]\n"); return; }
+        char ssid[128];
+        ssidLen = min(ssidLen, 127);
+        memcpy(ssid, ssidStart, ssidLen); ssid[ssidLen] = '\0';
+        while (*p == ' ') p++;
+        int passLen = strlen(p);
+        while (passLen > 0 && p[passLen-1] == ' ') passLen--;
+        char password[256];
+        if (passLen == 0)
+        {
+            strcpy(password, "irtx");
+        }
+        else
+        {
+            passLen = min(passLen, 255);
+            memcpy(password, p, passLen); password[passLen] = '\0';
+        }
+        prefs.begin("ap", false);
+        prefs.putString("ssid", ssid);
+        prefs.putString("password", password);
+        prefs.end();
+        LOG("Saved AP: ssid=\"%s\"\n", ssid);
+
+    }
     else if (strncmp(line, "name ", 5) == 0)
     {
         const char* p = line + 5;
