@@ -68,6 +68,15 @@ static void handleActivitiesUpload()
     }
 }
 
+static void handleGetDmesg()
+{
+    String output;
+    logStartCapture(&output);
+    dmesgPrint();
+    logEndCapture();
+    server.send(200, "text/plain", output);
+}
+
 static void handlePostCommand()
 {
     String cmd = server.arg("plain");
@@ -98,6 +107,7 @@ void setupHttp()
 
     const char *collectHeaderKeys[] = { "Content-Length" };
     server.collectHeaders(collectHeaderKeys, 1);
+    server.on("/dmesg", HTTP_GET, handleGetDmesg);
     server.on("/command", HTTP_POST, handlePostCommand);
     server.on("/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
     server.onNotFound(handleWebFile);

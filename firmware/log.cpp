@@ -63,13 +63,9 @@ void dmesgPrint()
     for (int i = 0; i < count; i++)
     {
         const char* line = dmesgRing[(start + i) % DMESG_LINES];
-        // Write directly to outputs, bypassing dmesgFeed to avoid re-storing replayed lines
-        Serial.println(line);
-        if (telnetFd >= 0)
-        {
-            send(telnetFd, line, strlen(line), MSG_DONTWAIT);
-            send(telnetFd, "\r\n", 2, MSG_DONTWAIT);
-        }
+        // Use logWriteRaw (not logWrite) to avoid re-storing replayed lines in dmesgFeed
+        logWriteRaw(line, strlen(line));
+        logWriteRaw("\n", 1);
     }
 }
 
