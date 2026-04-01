@@ -152,8 +152,13 @@ needing to connect to an existing network.
     setbootpin 9
     ```
 
-3. At boot, if the configured pin is held pressed, the device starts as an access point instead of
-   connecting to WiFi. Connect to the AP SSID and telnet to `192.168.4.1` to configure the device.
+3. Hold the pin pressed and power on (or reboot) the device. The status LED will turn yellow
+   to confirm AP mode is active.
+
+4. On your computer or phone, connect to the WiFi network matching the AP SSID you configured,
+   using the AP password (default: `irtx`).
+
+5. Telnet to `192.168.4.1` to access the device terminal and reconfigure as needed.
 
 Two pins can be specified with `setbootpin` — both must be pressed simultaneously at boot to trigger
 AP mode (useful to avoid accidental triggers).
