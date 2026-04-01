@@ -10,6 +10,7 @@
 #include "ble.h"
 #include "activities.h"
 #include "ir_rx.h"
+#include "gpio.h"
 
 WiFiUDP udp;
 static uint8_t packetBuffer[IR_HEADER_SIZE + MAX_TIMING_VALUES * 2];
@@ -126,6 +127,46 @@ void pollWifi()
     {
         udp.read(packetBuffer, packetSize); // flush runt
     }
+}
+
+// ---- Boot-pin AP check ----
+
+static bool isBootPinPressed(int pin)
+{
+    // Pullup: pin is active-low, pressed = LOW
+    for (int i = 0; i < gpioPullupCount; i++)
+        if (gpioPullupSlots[i].pinA == (uint8_t)pin || gpioPullupSlots[i].pinB == (uint8_t)pin)
+            return digitalRead(pin) == LOW;
+    // Pulldown: pin is active-high, pressed = HIGH
+    for (int i = 0; i < gpioPulldownCount; i++)
+        if (gpioPulldownSlots[i].pinA == (uint8_t)pin || gpioPulldownSlots[i].pinB == (uint8_t)pin)
+            return digitalRead(pin) == HIGH;
+    // Not found in either list — assume pullup behaviour
+    return digitalRead(pin) == LOW;
+}
+
+void setupWifiOrAP()
+{
+    prefs.begin("device", true);
+    int pin1 = prefs.getInt("bootpin1", -1);
+    int pin2 = prefs.getInt("bootpin2", -1);
+    prefs.end();
+
+    if (pin1 >= 0)
+    {
+        prefs.begin("ap", true);
+        String apSsid = prefs.getString("ssid", "");
+        prefs.end();
+
+        if (!apSsid.isEmpty() && isBootPinPressed(pin1) && (pin2 < 0 || isBootPinPressed(pin2)))
+        {
+            LOG("Boot pin pressed — starting access point\n");
+            startAccessPoint();
+            return;
+        }
+    }
+
+    setupWifi();
 }
 
 // ---- Switch to Access Point mode ----

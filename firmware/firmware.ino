@@ -38,7 +38,7 @@ void setup()
     setupIrRx();
     setupFs();
     setupActivities();
-    setupWifi();
+    setupWifiOrAP();
     setupHttp();
     setupBle();
 

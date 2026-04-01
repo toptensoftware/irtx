@@ -83,6 +83,32 @@ void handleCommand(const char* line)
         LOG("Saved AP: ssid=\"%s\"\n", ssid);
 
     }
+    else if (strncmp(line, "setbootpin ", 11) == 0)
+    {
+        const char* p = line + 11;
+        while (*p == ' ') p++;
+        char* end;
+        long pin1 = strtol(p, &end, 10);
+        if (end == p) { LOG("Usage: setbootpin <pin> [<pin>]\n"); return; }
+        p = end;
+        while (*p == ' ') p++;
+        long pin2 = -1;
+        if (*p)
+        {
+            char* end2;
+            long v = strtol(p, &end2, 10);
+            if (end2 != p) pin2 = v;
+        }
+        prefs.begin("device", false);
+        prefs.putInt("bootpin1", (int)pin1);
+        prefs.putInt("bootpin2", (int)pin2);
+        prefs.end();
+        if (pin2 >= 0)
+            LOG("Boot AP pins set to %ld+%ld\n", pin1, pin2);
+        else
+            LOG("Boot AP pin set to %ld\n", pin1);
+
+    }
     else if (strncmp(line, "name ", 5) == 0)
     {
         const char* p = line + 5;
@@ -253,6 +279,7 @@ void handleCommand(const char* line)
         PRINT("Commands:\n");
         PRINT("  setwifi <ssid> <password>              Save WiFi credentials and reconnect\n");
         PRINT("  setap <ssid> [<password>]              Save AP credentials (default pw: irtx)\n");
+        PRINT("  setbootpin <pin> [<pin>]               Pin(s) that trigger AP mode at boot\n");
         PRINT("  name <devicename>                      Set device name (restart to apply)\n");
         PRINT("  activity <name|index>                  Switch to activity by name or index\n");
         PRINT("  gpio [<pin> [<pin>] <mode>]            Show or set GPIO pin mode\n");
