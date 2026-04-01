@@ -19,7 +19,8 @@ static int               s_rmtSymbolCount = 0;
 
 // ---- In-flight state ----
 // Tracks the RMT transmission and the inter-packet gap that follows it.
-static bool     s_rmtBusy     = false;
+static bool          s_rmtBusy = false;
+static volatile bool s_rmtDone = false; // set by ISR when TX completes
 static uint32_t s_currentGap  = 0;
 static bool     s_gapWaiting  = false;
 static int64_t  s_gapExpiresAt = 0;
@@ -79,6 +80,13 @@ static void buildRmtSymbols(uint16_t* timings, int count)
     }
 }
 
+// ---- TX done callback (runs in ISR context) ----
+static bool IRAM_ATTR onTxDone(rmt_channel_handle_t channel, const rmt_tx_done_event_data_t* edata, void* ctx)
+{
+    s_rmtDone = true;
+    return false; // no task wakeup needed
+}
+
 // ---- Start an RMT transmission (non-blocking) ----
 // s_rmtSymbols must already be built. Buffer is free after this returns.
 static void startTransmit(uint32_t gap)
@@ -94,10 +102,10 @@ static void startTransmit(uint32_t gap)
         LOG("IR: transmit error: %s\n", esp_err_to_name(err));
         return;
     }
-    // s_rmtSymbols is now free — copy encoder has transferred to RMT memory.
-    setLed(LED_PRIORITY_ACTIVITY, 0x004000);    // Bright green
     s_rmtBusy    = true;
     s_currentGap = gap;
+    // s_rmtSymbols is now free — copy encoder has transferred to RMT memory.
+    setLed(LED_PRIORITY_ACTIVITY, 0x004000);    // Bright green
 }
 
 // ---- RMT Setup ----
@@ -125,6 +133,10 @@ void setupIrTx()
     rmt_copy_encoder_config_t encConfig = {};
     ESP_ERROR_CHECK(rmt_new_copy_encoder(&encConfig, &copyEncoder));
 
+    rmt_tx_event_callbacks_t cbs = {};
+    cbs.on_trans_done = onTxDone;
+    ESP_ERROR_CHECK(rmt_tx_register_event_callbacks(txChannel, &cbs, NULL));
+
     LOG("RMT TX initialized on GPIO %d, Carrier: %d Hz\n", IR_TX_PIN, CARRIER_FREQ);
 }
 
@@ -150,16 +162,17 @@ void pollIrTx()
 {
     if (txChannel == NULL) return;
 
-    // Check if RMT hardware has finished
-    if (s_rmtBusy)
+    // Check if RMT hardware has finished (signalled by ISR callback)
+    if (s_rmtBusy && s_rmtDone)
     {
-        if (rmt_tx_wait_all_done(txChannel, 0) == ESP_OK)
-        {
-            s_gapExpiresAt = esp_timer_get_time() + s_currentGap;
-            s_gapWaiting   = true;
-            s_rmtBusy      = false;
-            setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
-        }
+        s_rmtDone = false;
+        // TX is guaranteed done — rmt_tx_wait_all_done succeeds immediately, no log spam,
+        // and recycles the internal transaction descriptor back to the READY pool.
+        rmt_tx_wait_all_done(txChannel, 0);
+        s_gapExpiresAt = esp_timer_get_time() + s_currentGap;
+        s_gapWaiting   = true;
+        s_rmtBusy      = false;
+        setLed(LED_PRIORITY_ACTIVITY, 0xFFFFFFFF);
     }
 
     // Check if inter-packet gap has expired
