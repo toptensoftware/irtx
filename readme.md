@@ -77,18 +77,23 @@ The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the buil
 Use a serial monitor program (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure the device.  The 
 following serial terminal commands are available:
 
- *   `name <devicename>`          - set device name, takes effect after restart
- *   `setwifi <ssid> <password>`  - configure WiFi
- *   `status`                     - show device name, MAC, WiFi, IP, BLE pairing status
- *   `pair <bleslot>`             - pair a BLE device with a specified slot
- *   `unpair <bleslot>`           - unpair a BLE device slot
- *   `connect <bleslot>`          - connect to the paired device for a slot
- *   `nvsreset`                   - factory reset
- *   `nvsdump`                    - dump keys in NVS
- *   `reboot`                     - reboot the device
- *   `dmesg`                      - displays the message log (up to 50 past logged messages)
- *   `verbose on|off`             - enable or disable verbose logging (persisted across reboots)
- *   `gpio <pin> <function>`      - configures GPIO pins
+ *   `name <devicename>`                  - set device name, takes effect after restart
+ *   `setwifi <ssid> <password>`          - configure WiFi credentials and reconnect
+ *   `setap <ssid> [<password>]`          - configure access point credentials (default password: `irtx`)
+ *   `setbootpin <pin> [<pin>]`           - configure pin(s) that trigger AP mode at boot (see below)
+ *   `status`                             - show device name, MAC, WiFi, IP, BLE pairing status
+ *   `pair <bleslot>`                     - pair a BLE device with a specified slot
+ *   `unpair <bleslot>`                   - unpair a BLE device slot
+ *   `connect <bleslot>`                  - connect to the paired device for a slot
+ *   `led <r> <g> <b>` / `led clear`     - set or clear the user LED colour
+ *   `activity <name|index>`              - switch to an activity by name or index
+ *   `gpio [<pin> [<pin>] <mode>]`        - show or configure GPIO pins
+ *   `verbose on|off`                     - enable or disable verbose logging (persisted across reboots)
+ *   `nvsreset`                           - factory reset
+ *   `nvsdump`                            - dump keys in NVS
+ *   `reboot`                             - reboot the device
+ *   `dmesg`                              - displays the message log (up to 50 past logged messages)
+ *   `help`                               - list all commands
 
 By default, no GPIO pins are configured.
 
@@ -125,6 +130,38 @@ gpio 12 13 pulldown
 
 Note: button and encoder inputs don't do anything unless also configured in the activities configuration to
 perform operations.
+
+
+
+## Access Point Mode
+
+The device can be started in WiFi access point (AP) mode for configuration via telnet or HTTP without
+needing to connect to an existing network.
+
+1. Configure the AP SSID (and optionally a password, default is `irtx`):
+
+    ```
+    setap mydevice-ap
+    ```
+
+2. Configure a GPIO pin that will trigger AP mode when held at boot. The pin should also be configured
+   as a pullup or pulldown input using the `gpio` command:
+
+    ```
+    gpio 9 pullup
+    setbootpin 9
+    ```
+
+3. Hold the pin pressed and power on (or reboot) the device. The status LED will turn yellow
+   to confirm AP mode is active.
+
+4. On your computer or phone, connect to the WiFi network matching the AP SSID you configured,
+   using the AP password (default: `irtx`).
+
+5. Telnet to `192.168.4.1` to access the device terminal and reconfigure as needed.
+
+Two pins can be specified with `setbootpin` — both must be pressed simultaneously at boot to trigger
+AP mode (useful to avoid accidental triggers).
 
 
 

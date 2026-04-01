@@ -38,11 +38,12 @@ void setup()
     setupIrRx();
     setupFs();
     setupActivities();
-    setupWifi();
+    setupWifiOrAP();
     setupHttp();
     setupBle();
 
-    setLed(LED_PRIORITY_CONNECTIVITY, 0x000400);    // Green (ready)
+    // Green = STA connected, Yellow = AP mode
+    setLed(LED_PRIORITY_CONNECTIVITY, WiFi.getMode() == WIFI_AP ? 0x040400 : 0x000400);
 }
 
 void loop()

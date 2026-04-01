@@ -71,10 +71,10 @@ static void setupServer()
 
 void pollTelnet()
 {
-    // Lazy setup: wait until WiFi is up
+    // Lazy setup: wait until WiFi is up (STA connected or AP active)
     if (serverFd < 0)
     {
-        if (WiFi.status() != WL_CONNECTED) return;
+        if (WiFi.status() != WL_CONNECTED && WiFi.getMode() != WIFI_AP) return;
         setupServer();
         if (serverFd < 0) return;
     }

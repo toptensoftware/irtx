@@ -52,6 +52,63 @@ void handleCommand(const char* line)
         }
 
     }
+    else if (strncmp(line, "setap ", 6) == 0)
+    {
+        const char* p = line + 6;
+        while (*p == ' ') p++;
+        const char* ssidStart = p;
+        while (*p && *p != ' ') p++;
+        int ssidLen = p - ssidStart;
+        if (ssidLen == 0) { LOG("Usage: setap <ssid> [<password>]\n"); return; }
+        char ssid[128];
+        ssidLen = min(ssidLen, 127);
+        memcpy(ssid, ssidStart, ssidLen); ssid[ssidLen] = '\0';
+        while (*p == ' ') p++;
+        int passLen = strlen(p);
+        while (passLen > 0 && p[passLen-1] == ' ') passLen--;
+        char password[256];
+        if (passLen == 0)
+        {
+            strcpy(password, "irtx");
+        }
+        else
+        {
+            passLen = min(passLen, 255);
+            memcpy(password, p, passLen); password[passLen] = '\0';
+        }
+        prefs.begin("ap", false);
+        prefs.putString("ssid", ssid);
+        prefs.putString("password", password);
+        prefs.end();
+        LOG("Saved AP: ssid=\"%s\"\n", ssid);
+
+    }
+    else if (strncmp(line, "setbootpin ", 11) == 0)
+    {
+        const char* p = line + 11;
+        while (*p == ' ') p++;
+        char* end;
+        long pin1 = strtol(p, &end, 10);
+        if (end == p) { LOG("Usage: setbootpin <pin> [<pin>]\n"); return; }
+        p = end;
+        while (*p == ' ') p++;
+        long pin2 = -1;
+        if (*p)
+        {
+            char* end2;
+            long v = strtol(p, &end2, 10);
+            if (end2 != p) pin2 = v;
+        }
+        prefs.begin("device", false);
+        prefs.putInt("bootpin1", (int)pin1);
+        prefs.putInt("bootpin2", (int)pin2);
+        prefs.end();
+        if (pin2 >= 0)
+            LOG("Boot AP pins set to %ld+%ld\n", pin1, pin2);
+        else
+            LOG("Boot AP pin set to %ld\n", pin1);
+
+    }
     else if (strncmp(line, "name ", 5) == 0)
     {
         const char* p = line + 5;
@@ -216,6 +273,29 @@ void handleCommand(const char* line)
         PRINT("Rebooting...\n");
         delay(500);
         esp_restart();
+    }
+    else if (strcmp(line, "help") == 0)
+    {
+        PRINT("Commands:\n");
+        PRINT("  setwifi <ssid> <password>              Save WiFi credentials and reconnect\n");
+        PRINT("  setap <ssid> [<password>]              Save AP credentials (default pw: irtx)\n");
+        PRINT("  setbootpin <pin> [<pin>]               Pin(s) that trigger AP mode at boot\n");
+        PRINT("  name <devicename>                      Set device name (restart to apply)\n");
+        PRINT("  activity <name|index>                  Switch to activity by name or index\n");
+        PRINT("  gpio [<pin> [<pin>] <mode>]            Show or set GPIO pin mode\n");
+        PRINT("    modes: grb, rgb, irrx, irtx, pullup, pulldown\n");
+        PRINT("  led <r> <g> <b>                        Set LED colour\n");
+        PRINT("  led clear                              Clear user LED override\n");
+        PRINT("  pair <index>                           Pair BLE device at index\n");
+        PRINT("  unpair <index>                         Unpair BLE device at index\n");
+        PRINT("  connect <index>                        Connect to paired BLE device\n");
+        PRINT("  verbose on|off                         Enable or disable verbose logging\n");
+        PRINT("  status                                 Show full device status\n");
+        PRINT("  dmesg                                  Print boot log\n");
+        PRINT("  nvsdump                                Dump NVS storage contents\n");
+        PRINT("  nvsreset                               Reset all NVS storage\n");
+        PRINT("  reboot                                 Restart the device\n");
+        PRINT("  help                                   Show this help\n");
     }
     else if (*line == '\0')
     {
