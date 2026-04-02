@@ -38,26 +38,37 @@ if [ -z "$BOARD" ]; then echo "Usage: $0 [--build] [--flash] <c3|c6> [<port>]"; 
 # If neither flag given, do both
 if ! $DO_BUILD && ! $DO_FLASH; then DO_BUILD=true; DO_FLASH=true; fi
 
+# Work out board fqbn
 case "$BOARD" in
   c3) FQBN=esp32:esp32:waveshare_esp32_c3_zero:PartitionScheme=huge_app ;;
   c6) FQBN=esp32:esp32:esp32c6:CDCOnBoot=cdc,PartitionScheme=huge_app ;;
 esac
 
-OUTPUT_DIR=../build/$BOARD
+# Setup output directory
+OUTPUT_DIR=./out/$BOARD
 mkdir -p $OUTPUT_DIR
 
+# Build
 if $DO_BUILD; then
-  (cd .. && node pack-web.js)
+
+  # Build web ui
+  (cd ./webui && npm install && npm run build)
+
+  # Pack web ui into C++ source file
+  node pack-web.js
+
+  # Build firmware
   CLEAN_FLAG=""
   $DO_CLEAN && CLEAN_FLAG="--clean"
   VERBOSE_FLAG=""
   $DO_VERBOSE && VERBOSE_FLAG="--verbose"
-  arduino-cli compile --fqbn $FQBN --build-path $OUTPUT_DIR $CLEAN_FLAG $VERBOSE_FLAG .
+  arduino-cli compile --fqbn $FQBN --build-path $OUTPUT_DIR $CLEAN_FLAG $VERBOSE_FLAG ./firmware
 fi
 
+# Flash
 if $DO_FLASH; then
   if [ -z "$PORT" ]; then echo "Error: port required for flash"; exit 1; fi
-  arduino-cli upload --fqbn $FQBN --build-path $OUTPUT_DIR --port $PORT .
+  arduino-cli upload --fqbn $FQBN --build-path $OUTPUT_DIR --port $PORT ./firmware
 fi
 
 
