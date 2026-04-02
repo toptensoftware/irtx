@@ -40,6 +40,24 @@ static void handleWebFile()
             return;
         }
     }
+
+    // SPA fallback: for GET/HEAD return index.html so the client-side router
+    // can handle the URL. All other methods get a 404.
+    if (server.method() == HTTP_GET || server.method() == HTTP_HEAD)
+    {
+        for (int i = 0; i < web_files_count; i++)
+        {
+            if (strcmp(web_files[i].path, "/index.html") == 0)
+            {
+                server.sendHeader("Content-Encoding", "gzip");
+                server.send_P(200, web_files[i].content_type,
+                              (const char*)web_files[i].data,
+                              web_files[i].size);
+                return;
+            }
+        }
+    }
+
     handleNotFound();
 }
 
