@@ -1,0 +1,42 @@
+{
+  "device": {
+    "name": "reblaster",
+    "logging": "standard"
+  },
+  "gpio": {
+    "irtx_pin": 10,
+    "irrx_pin": -1,
+    "led_pin": 8,
+    "led_order": "grb",
+    "pullup": [18, 19, 20, [22, 21]],
+    "pulldown": []
+  },
+  "protocols": [
+    { "name": "nec", "id": "0x2043454E", "bits": 32 },
+    { "name": "pana", "id": "0x414E4150", "bits": 48 }
+  ],
+  "wifi": {
+    "mode": "sta",
+    "ssid": "SkyNet",
+    "connected": true,
+    "ip": "10.1.1.101",
+    "gateway": "10.1.1.1",
+    "rssi": -40,
+    "mac": "6C:13:9B:16:A3:98",
+    "udp_port": 4210
+  },
+  "ble": [
+    { "slot": 0, "id": "FB:46:CE:43:F6:CD", "peer": "CC:D2:81:67:1A:27" },
+    { "slot": 1, "id": "C4:B9:31:BC:09:32" },
+    { "slot": 2, "id": "D1:EC:64:E9:5C:67" },
+    { "slot": 3, "id": "FA:47:CF:42:F7:CC" }
+  ],
+  "activities": {
+    "devices": [
+    ],
+    "list": [
+      { "index": 0, "name": "default", "active": true }
+    ],
+    "queue": "empty"
+  }
+}
