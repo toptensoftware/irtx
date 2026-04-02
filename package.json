@@ -1,8 +1,5 @@
 {
     "type": "module",
-    "scripts": {
-        "pack-web": "node pack-web.js"
-    },
     "dependencies": {
         "@toptensoftware/binpack": "github:toptensoftware/binpack"
     }

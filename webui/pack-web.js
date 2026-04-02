@@ -7,6 +7,10 @@ import { readdirSync, readFileSync, writeFileSync, statSync, existsSync, mkdirSy
 import { join, relative, extname } from 'path';
 import { gzipSync } from 'zlib';
 
+const webDir = '../out/dist';
+const outFile = '../out/web_files.h';
+
+
 const CONTENT_TYPES = {
     '.html': 'text/html',
     '.css':  'text/css',
@@ -55,8 +59,6 @@ function formatHex(buf) {
 
 // ---- main ----
 
-const webDir = 'webui/dist';
-const outFile = 'firmware/web_files.h';
 
 if (!existsSync(webDir)) {
     console.error(`Directory '${webDir}' not found`);
@@ -97,6 +99,7 @@ const out = [
 ];
 
 const entries = [];
+let totalSize = 0;
 
 for (const file of files) {
     const urlPath = '/' + relative(webDir, file).replace(/\\/g, '/');
@@ -112,7 +115,10 @@ for (const file of files) {
 
     entries.push({ urlPath, id, type: contentType(file), size: gz.length });
     console.log(`  ${urlPath}: ${raw.length} B → ${gz.length} B`);
+    totalSize += gz.length;
 }
+
+console.log("Total gzipped size: " + totalSize + " B");
 
 out.push('static const WEB_FILE web_files[] = {');
 for (const { urlPath, id, type } of entries) {

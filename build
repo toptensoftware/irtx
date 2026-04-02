@@ -51,11 +51,11 @@ mkdir -p $OUTPUT_DIR
 # Build
 if $DO_BUILD; then
 
-  # Build web ui
+  # Build web ui and pack into web_files.h
   (cd ./webui && npm install && npm run build)
 
-  # Pack web ui into C++ source file
-  node pack-web.js
+  # Only copy web_files.hif changed to avoid unnecessary rebuilds
+  cmp -s ./out/web_files.h ./firmware/web_files.h || cp ./out/web_files.h ./firmware/web_files.h
 
   # Build firmware
   CLEAN_FLAG=""

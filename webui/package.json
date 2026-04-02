@@ -4,7 +4,7 @@
   "description": "webui Single Page App",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node ./pack-web.js",
     "dev": "coserv --dev",
     "prod": "npm run build && coserv --prod"
   },
