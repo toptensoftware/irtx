@@ -8,7 +8,7 @@ export class HomePage extends Component
     onMount()
     {
         this.load(async () => {
-            let r = await fetch(`${config.deviceUrl}/status`);
+            let r = await fetch(`${config.deviceUrl}/api/status`);
             if (!r.ok)
                 throw new Error(`HTTP ${r.status}`);
             this.status = await r.json();

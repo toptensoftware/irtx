@@ -19,6 +19,13 @@ export class Header extends Component
                 ]
             },
             {
+                type: "nav .nav-links",
+                $: [
+                    { type: "a", attr_href: "/", text: "Status" },
+                    { type: "a", attr_href: "/dmesg", text: "Log" },
+                ]
+            },
+            {
                 type: "div .buttons",
                 $: [
                     {
@@ -79,6 +86,27 @@ css`
         }
     }
 
+
+    .nav-links
+    {
+        display: flex;
+        gap: 20px;
+        margin-right: 20px;
+
+        a
+        {
+            color: var(--body-fore-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            transition: opacity 0.15s;
+
+            &:hover
+            {
+                opacity: 1;
+            }
+        }
+    }
 
     .buttons
     {

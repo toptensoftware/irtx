@@ -125,10 +125,10 @@ void setupHttp()
 
     const char *collectHeaderKeys[] = { "Content-Length" };
     server.collectHeaders(collectHeaderKeys, 1);
-    server.on("/status", HTTP_GET, handleGetStatus);
-    server.on("/dmesg", HTTP_GET, handleGetDmesg);
-    server.on("/command", HTTP_POST, handlePostCommand);
-    server.on("/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
+    server.on("/api/status", HTTP_GET, handleGetStatus);
+    server.on("/api/dmesg", HTTP_GET, handleGetDmesg);
+    server.on("/api/command", HTTP_POST, handlePostCommand);
+    server.on("/api/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
     server.onNotFound(handleWebFile);
 
     server.begin();

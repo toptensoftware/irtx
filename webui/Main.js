@@ -3,6 +3,7 @@ import { Header } from "./Header.js";
 import { Meta } from "./Meta.js";
 
 import "./HomePage.js";
+import "./DmesgPage.js";
 import "./NotFoundPage.js";
 
 // Main application
