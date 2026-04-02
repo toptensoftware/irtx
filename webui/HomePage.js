@@ -195,14 +195,19 @@ export class HomePage extends Component
                                                     type: "button",
                                                     class: "action-btn",
                                                     text: "Make Active",
-                                                    on_click: (c, ev, ctx) => c.makeActive(ctx.model.index),
+                                                    on_click: (item, ev, ctx) => ctx.outer.model.makeActive(ctx.index),
+                                                },
+                                                {
+                                                    if: a => !a.active && !a.default,
+                                                    type: "span",
+                                                    text: " | ",
                                                 },
                                                 {
                                                     if: a => !a.default,
                                                     type: "button",
                                                     class: "action-btn",
                                                     text: "Make Default",
-                                                    on_click: (c, ev, ctx) => c.makeDefault(ctx.model.index),
+                                                    on_click: (item, ev, ctx) => ctx.outer.model.makeDefault(ctx.index),
                                                 },
                                             ]
                                         },
@@ -277,8 +282,6 @@ css`
 
     .activity-actions
     {
-        display: flex;
-        gap: 8px;
     }
 
     .action-btn
