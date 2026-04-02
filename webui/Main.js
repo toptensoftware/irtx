@@ -1,6 +1,7 @@
 import { Component, css, router } from "@codeonlyjs/core";
 import { Header } from "./Header.js";
 import { Meta } from "./Meta.js";
+import { config } from "./config.js";
 
 import "./HomePage.js";
 import "./DmesgPage.js";
@@ -52,8 +53,12 @@ css`
 `;
 
 // Main entry point, create Application and mount
-export function main()
+export function main(deviceUrl)
 {
+    // Patch device url
+    if (deviceUrl)
+        config.deviceUrl = deviceUrl;
+
     new Meta().mount("head");
     new Main().mount("body");
     router.start();

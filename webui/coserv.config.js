@@ -6,7 +6,7 @@ const config = {
             ],
             replace: [
                 { from: "./Main.js", to: "/Main.js" },
-                //{ from: "deviceUrl: \"\"", to: "deviceUrl: \"http://192.168.4.1\"" }
+                { from: "main();", to: "main(\"http://10.1.1.101\");" }
             ],
         },
     }
