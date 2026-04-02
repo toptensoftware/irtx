@@ -23,12 +23,41 @@ static void handleNotFound()
     server.send(404, "text/plain", "Not found");
 }
 
+static const char* mimeTypeForPath(const String& path)
+{
+    struct { const char* ext; const char* mime; } table[] = {
+        { ".html", "text/html" },
+        { ".css",  "text/css" },
+        { ".js",   "application/javascript" },
+        { ".json", "application/json" },
+        { ".txt",  "text/plain" },
+        { ".xml",  "application/xml" },
+        { ".bin",  "application/octet-stream" },
+        { ".png",  "image/png" },
+        { ".jpg",  "image/jpeg" },
+        { ".jpeg", "image/jpeg" },
+        { ".gif",  "image/gif" },
+        { ".svg",  "image/svg+xml" },
+        { ".ico",  "image/x-icon" },
+        { ".pdf",  "application/pdf" },
+        { ".gz",   "application/gzip" },
+        { ".zip",  "application/zip" },
+    };
+    for (auto& e : table)
+    {
+        if (path.endsWith(e.ext))
+            return e.mime;
+    }
+    return "application/octet-stream";
+}
+
 static void handleWebFile()
 {
     String path = server.uri();
     if (path == "/")
         path = "/index.html";
 
+    // 1. Built-in web UI files (gzip-compressed, served from flash)
     for (int i = 0; i < web_files_count; i++)
     {
         if (path == web_files[i].path)
@@ -41,7 +70,19 @@ static void handleWebFile()
         }
     }
 
-    // SPA fallback: for GET/HEAD return index.html so the client-side router
+    // 2. User files on LittleFS
+    if (LittleFS.exists(path))
+    {
+        File f = LittleFS.open(path, "r");
+        if (f)
+        {
+            server.streamFile(f, mimeTypeForPath(path));
+            f.close();
+            return;
+        }
+    }
+
+    // 3. SPA fallback: for GET/HEAD return index.html so the client-side router
     // can handle the URL. All other methods get a 404.
     if (server.method() == HTTP_GET || server.method() == HTTP_HEAD)
     {
@@ -63,17 +104,28 @@ static void handleWebFile()
 
 static File uploadFile;
 static int uploadBytesWritten;
+static char uploadFilename[64];
 
-static void handleActivitiesUpload()
+static void handleFileUpload()
 {
     HTTPUpload& upload = server.upload();
 
     if (upload.status == UPLOAD_FILE_START)
     {
+        String filename = server.arg("filename");
+        if (filename.length() == 0)
+        {
+            LOG("HTTP: /api/upload missing filename param\n");
+            uploadFilename[0] = '\0';
+            return;
+        }
+        if (!filename.startsWith("/"))
+            filename = "/" + filename;
+        filename.toCharArray(uploadFilename, sizeof(uploadFilename));
         uploadBytesWritten = 0;
-        uploadFile = LittleFS.open("/activities.bin", "w");
+        uploadFile = LittleFS.open(uploadFilename, "w");
         if (!uploadFile)
-            LOG("HTTP: failed to open /activities.bin for writing\n");
+            LOG("HTTP: failed to open %s for writing\n", uploadFilename);
     }
     else if (upload.status == UPLOAD_FILE_WRITE)
     {
@@ -85,10 +137,25 @@ static void handleActivitiesUpload()
         if (uploadFile)
         {
             uploadFile.close();
-            LOG("HTTP: wrote %d bytes to /activities.bin\n", uploadBytesWritten);
-            reloadActivities();
+            LOG("HTTP: wrote %d bytes to %s\n", uploadBytesWritten, uploadFilename);
         }
     }
+}
+
+static void handlePostUpload()
+{
+    addCorsHeaders();
+    if (uploadFilename[0] == '\0')
+        server.send(400, "text/plain", "missing filename param\n");
+    else
+        server.send(200, "text/plain", "OK");
+}
+
+static void handlePostReloadActivities()
+{
+    addCorsHeaders();
+    reloadActivities();
+    server.send(200, "text/plain", "OK");
 }
 
 static void handleGetStatus()
@@ -128,12 +195,6 @@ static void handlePostCommand()
     server.send(200, "text/plain", output);
 }
 
-static void handlePostActivities()
-{
-    addCorsHeaders();
-    server.send(200, "text/plain", "OK");
-}
-
 // ---- Setup ----
 
 void setupHttp()
@@ -146,7 +207,8 @@ void setupHttp()
     server.on("/api/status", HTTP_GET, handleGetStatus);
     server.on("/api/dmesg", HTTP_GET, handleGetDmesg);
     server.on("/api/command", HTTP_POST, handlePostCommand);
-    server.on("/api/activities", HTTP_POST, handlePostActivities, handleActivitiesUpload);
+    server.on("/api/upload", HTTP_POST, handlePostUpload, handleFileUpload);
+    server.on("/api/reload-activities", HTTP_POST, handlePostReloadActivities);
     server.onNotFound(handleWebFile);
 
     server.begin();

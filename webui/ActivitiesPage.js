@@ -11,6 +11,11 @@ export class ActivitiesPage extends Component
         return this.fileInput?.files[0] ?? null;
     }
 
+    get selectedSourceFile()
+    {
+        return this.sourceFileInput?.files[0] ?? null;
+    }
+
     async upload()
     {
         if (this.busy || !this.selectedFile)
@@ -22,25 +27,50 @@ export class ActivitiesPage extends Component
 
         try
         {
-            let body = new FormData();
-            body.append("file", this.selectedFile);
+            const postFile = async (file, filename) => {
+                let body = new FormData();
+                body.append("file", file);
+                return fetch(`${config.deviceUrl}/api/upload?filename=${encodeURIComponent(filename)}`, {
+                    method: "POST",
+                    body,
+                });
+            };
 
-            let r = await fetch(`${config.deviceUrl}/api/activities`, {
-                method: "POST",
-                body,
-            });
+            let r = await postFile(this.selectedFile, "activities.bin");
+            if (!r.ok)
+            {
+                this.result = { ok: false, message: `Binary upload failed: HTTP ${r.status}` };
+                return;
+            }
 
-            this.result = r.ok
-                ? { ok: true,  message: "Upload successful." }
-                : { ok: false, message: `Upload failed: HTTP ${r.status}` };
+            if (this.selectedSourceFile)
+            {
+                let r2 = await postFile(this.selectedSourceFile, "activities.js");
+                if (!r2.ok)
+                {
+                    this.result = { ok: false, message: `Source upload failed: HTTP ${r2.status}` };
+                    return;
+                }
+            }
+
+            let r3 = await fetch(`${config.deviceUrl}/api/reload-activities`, { method: "POST" });
+            if (!r3.ok)
+            {
+                this.result = { ok: false, message: `Reload failed: HTTP ${r3.status}` };
+                return;
+            }
+
+            this.result = { ok: true, message: "Upload successful." };
         }
         catch (e)
         {
             this.result = { ok: false, message: `Upload failed: ${e.message}` };
         }
-
-        this.busy = false;
-        this.invalidate();
+        finally
+        {
+            this.busy = false;
+            this.invalidate();
+        }
     }
 
     onSubmit(ev)
@@ -54,7 +84,7 @@ export class ActivitiesPage extends Component
         class: "activities-page",
         $: [
             $.h1("Upload Activities"),
-            $.p("Select a compiled activities.bin file to upload to the device."),
+            $.p("Select a compiled activities.bin file to upload to the device. Optionally also upload the source activities.js to keep a reference copy on the device."),
             {
                 type: "form",
                 on_submit: "onSubmit",
@@ -63,12 +93,25 @@ export class ActivitiesPage extends Component
                         type: "div",
                         class: "field",
                         $: [
-                            $.label.attr_for("file-input").text("File"),
+                            $.label.attr_for("file-input").text("Binary (activities.bin)"),
                             {
                                 type: "input type=file",
                                 id: "file-input",
                                 attr_accept: ".bin",
                                 bind: "fileInput",
+                            },
+                        ]
+                    },
+                    {
+                        type: "div",
+                        class: "field",
+                        $: [
+                            $.label.attr_for("source-file-input").text("Source (activities.js, optional)"),
+                            {
+                                type: "input type=file",
+                                id: "source-file-input",
+                                attr_accept: ".js",
+                                bind: "sourceFileInput",
                             },
                         ]
                     },

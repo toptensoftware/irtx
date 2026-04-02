@@ -304,6 +304,64 @@ Simulates the receipt of an IR code and dispatches it through the activity syste
 
 
 
+## HTTP API
+
+The device runs an HTTP server on port 80. All API endpoints return `text/plain` unless noted.
+
+### `GET /api/status`
+
+Returns a JSON object with the current device status (name, MAC address, WiFi, IP, BLE pairing state). Equivalent to the `status` serial/telnet command.
+
+### `GET /api/dmesg`
+
+Returns the device message log as plain text (up to the last 50 entries). Equivalent to the `dmesg` serial/telnet command.
+
+### `POST /api/command`
+
+Executes a serial/telnet command on the device. The request body is the command string (plain text). Returns the command output as plain text.
+
+```
+POST /api/command
+Content-Type: text/plain
+
+status
+```
+
+### `POST /api/upload?filename=<name>`
+
+Uploads a file and writes it to LittleFS. The file is supplied as a `multipart/form-data` body with a single `file` field. The `filename` query parameter sets the destination path on the device — a leading `/` is added automatically if omitted.
+
+```
+POST /api/upload?filename=activities.bin
+Content-Type: multipart/form-data; boundary=...
+```
+
+### `POST /api/reload-activities`
+
+Reloads `activities.bin` from LittleFS and makes it the active configuration. Call this after uploading a new `activities.bin` via `/api/upload`.
+
+### `GET /<path>`
+
+Serves files in the following priority order:
+
+1. **Built-in web UI** — files compiled into the firmware (gzip-compressed, served from flash)
+2. **LittleFS** — user-uploaded files (e.g. `activities.bin`, `activities.js`)
+3. **SPA fallback** — `GET`/`HEAD` requests that match no file return `index.html` so the client-side router can handle the URL
+
+MIME types are inferred from the file extension: `.html`, `.css`, `.js`, `.json`, `.txt`, `.xml`, `.bin`, `.png`, `.jpg`/`.jpeg`, `.gif`, `.svg`, `.ico`, `.pdf`, `.gz`, `.zip`. Unknown extensions are served as `application/octet-stream`.
+
+The following files have special meaning:
+
+| File | Location | Description |
+|------|----------|-------------|
+| `/activities.js` | LittleFS | Source file for the current activity configuration (uploaded for reference) |
+| `/activities.bin` | LittleFS | Compiled binary form of `activities.js`, loaded by the firmware at boot and on reload |
+| `/binpack.js` | firmware (built-in) | Type definitions used to compile `activities.js` into `activities.bin` (fetched by the CLI at upload time) |
+
+`/activities.js` and `/activities.bin` are kept in sync by the upload workflow — the CLI and web UI both upload both files together and then call `/api/reload-activities`.
+
+
+
 ## Activities
 
 Besides acting as a dumb IR blaster, irtx can also manage a set of "activities".  
