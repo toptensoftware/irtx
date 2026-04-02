@@ -5,6 +5,7 @@ import { Meta } from "./Meta.js";
 import "./HomePage.js";
 import "./DmesgPage.js";
 import "./ConsolePage.js";
+import "./ActivitiesPage.js";
 import "./NotFoundPage.js";
 
 // Main application

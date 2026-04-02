@@ -880,13 +880,18 @@ void statusActivities()
               i < activitiesConfig->devices_count - 1 ? "," : "");
     }
     PRINT("    ],\n");
+    prefs.begin("device", true);
+    int defact = prefs.getInt("defact", 0);
+    prefs.end();
+
     PRINT("    \"list\": [\n");
     for (uint32_t i = 0; i < activitiesConfig->activities_count; i++)
     {
         PRINT("      { \"index\": %d, \"name\": ", (int)i);
         printJsonString(activitiesConfig->activities[i].name);
-        PRINT(", \"active\": %s }%s\n",
+        PRINT(", \"active\": %s, \"default\": %s }%s\n",
               (int)i == s_currentActivity ? "true" : "false",
+              (int)i == defact ? "true" : "false",
               i < activitiesConfig->activities_count - 1 ? "," : "");
     }
     PRINT("    ],\n");

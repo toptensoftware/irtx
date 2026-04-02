@@ -4,16 +4,46 @@ import { config } from "./config.js";
 export class HomePage extends Component
 {
     status = null;
+    busy = false;
 
     onMount()
     {
-        this.load(async () => {
+        this.loadStatus();
+    }
+
+    async loadStatus()
+    {
+        await this.load(async () => {
             let r = await fetch(`${config.deviceUrl}/api/status`);
             if (!r.ok)
                 throw new Error(`HTTP ${r.status}`);
             this.status = await r.json();
         });
     }
+
+    async sendCommand(cmd)
+    {
+        if (this.busy) return;
+        this.busy = true;
+        this.invalidate();
+        try
+        {
+            let r = await fetch(`${config.deviceUrl}/api/command`, {
+                method: "POST",
+                body: cmd,
+            });
+            if (!r.ok)
+                throw new Error(`HTTP ${r.status}`);
+        }
+        finally
+        {
+            this.busy = false;
+        }
+        await this.loadStatus();
+    }
+
+    makeActive(index)  { this.sendCommand(`activity ${index}`); }
+    makeDefault(index) { this.sendCommand(`setdefact ${index}`); }
 
     formatPins(pins)
     {
@@ -140,19 +170,11 @@ export class HomePage extends Component
                     $.h2("Activities"),
                     {
                         type: "table",
-                        class: "kv-table",
-                        $: [
-                            { type: "tr", $: [$.th("Queue"),   { type: "td", text: c => c.status.activities.queue }] },
-                            { type: "tr", $: [$.th("Devices"), { type: "td", text: c => c.status.activities.devices.length === 0 ? "none" : c.status.activities.devices.join(", ") }] },
-                        ]
-                    },
-                    {
-                        type: "table",
                         class: "data-table",
                         $: [
                             {
                                 type: "thead",
-                                $: { type: "tr", $: [$.th("#"), $.th("Name"), $.th("Active")] }
+                                $: { type: "tr", $: [$.th("#"), $.th("Name"), $.th("Active"), $.th("Default"), $.th("")] }
                             },
                             {
                                 type: "tbody",
@@ -163,6 +185,27 @@ export class HomePage extends Component
                                         { type: "td", text: a => String(a.index) },
                                         { type: "td", text: a => a.name },
                                         { type: "td", text: a => a.active ? "✓" : "" },
+                                        { type: "td", text: a => a.default ? "✓" : "" },
+                                        {
+                                            type: "td",
+                                            class: "activity-actions",
+                                            $: [
+                                                {
+                                                    if: a => !a.active,
+                                                    type: "button",
+                                                    class: "action-btn",
+                                                    text: "Make Active",
+                                                    on_click: (c, ev, ctx) => c.makeActive(ctx.model.index),
+                                                },
+                                                {
+                                                    if: a => !a.default,
+                                                    type: "button",
+                                                    class: "action-btn",
+                                                    text: "Make Default",
+                                                    on_click: (c, ev, ctx) => c.makeDefault(ctx.model.index),
+                                                },
+                                            ]
+                                        },
                                     ]
                                 }
                             }
@@ -229,6 +272,29 @@ css`
         td
         {
             padding-right: 24px;
+        }
+    }
+
+    .activity-actions
+    {
+        display: flex;
+        gap: 8px;
+    }
+
+    .action-btn
+    {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 0.8rem;
+        color: var(--accent-color, #4af);
+        cursor: pointer;
+        opacity: 0.8;
+
+        &:hover
+        {
+            opacity: 1;
+            text-decoration: underline;
         }
     }
 
