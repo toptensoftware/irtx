@@ -55,7 +55,7 @@ function formatHex(buf) {
 
 // ---- main ----
 
-const webDir = 'web';
+const webDir = 'webui/dist';
 const outFile = 'firmware/web_files.h';
 
 if (!existsSync(webDir)) {

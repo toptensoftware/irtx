@@ -13,6 +13,11 @@ static WebServer server(80);
 
 // ---- Handlers ----
 
+static void addCorsHeaders()
+{
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+}
+
 static void handleNotFound()
 {
     server.send(404, "text/plain", "Not found");
@@ -70,6 +75,7 @@ static void handleActivitiesUpload()
 
 static void handleGetStatus()
 {
+    addCorsHeaders();
     String output;
     logStartCapture(&output);
     handleCommand("status");
@@ -79,6 +85,7 @@ static void handleGetStatus()
 
 static void handleGetDmesg()
 {
+    addCorsHeaders();
     String output;
     logStartCapture(&output);
     dmesgPrint();
@@ -88,6 +95,7 @@ static void handleGetDmesg()
 
 static void handlePostCommand()
 {
+    addCorsHeaders();
     String cmd = server.arg("plain");
     cmd.trim();
     if (cmd.length() == 0)
@@ -104,6 +112,7 @@ static void handlePostCommand()
 
 static void handlePostActivities()
 {
+    addCorsHeaders();
     server.send(200, "text/plain", "OK");
 }
 
