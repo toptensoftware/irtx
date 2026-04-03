@@ -24,6 +24,7 @@ export class Header extends Component
                     { type: "a", attr_href: "/", text: "Status" },
                     { type: "a", attr_href: "/dmesg", text: "Log" },
                     { type: "a", attr_href: "/activities", text: "Activities" },
+                    { type: "a", attr_href: "/activities-editor", text: "Editor" },
                     { type: "a", attr_href: "/console", text: "Console" },
                 ]
             },

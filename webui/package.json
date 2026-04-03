@@ -12,7 +12,8 @@
   "license": "ISC",
   "dependencies": {
     "@codeonlyjs/core": "codeonlyjs/core#semver:^0.1",
-    "@codeonlyjs/coserv": "github:codeonlyjs/coserv"
+    "@codeonlyjs/coserv": "github:codeonlyjs/coserv",
+    "@toptensoftware/binpack": "github:toptensoftware/binpack"
   },
   "devDependencies": {
     "@codeonlyjs/cogent": "github:codeonlyjs/cogent",
@@ -21,4 +22,3 @@
     "vite-plugin-static-copy": "^2.0.0"
   }
 }
-

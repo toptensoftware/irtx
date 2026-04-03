@@ -3,6 +3,7 @@ const config = {
         bundleFree: {
             modules: [ 
                 "@codeonlyjs/core",
+                "@toptensoftware/binpack",
             ],
             replace: [
                 { from: "./Main.js", to: "/Main.js" },

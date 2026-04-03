@@ -62,6 +62,7 @@ static void handleWebFile()
     {
         if (path == web_files[i].path)
         {
+            addCorsHeaders();
             server.sendHeader("Content-Encoding", "gzip");
             server.send_P(200, web_files[i].content_type,
                           (const char*)web_files[i].data,
@@ -76,6 +77,7 @@ static void handleWebFile()
         File f = LittleFS.open(path, "r");
         if (f)
         {
+            addCorsHeaders();
             server.streamFile(f, mimeTypeForPath(path));
             f.close();
             return;

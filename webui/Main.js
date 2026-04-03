@@ -7,6 +7,7 @@ import "./HomePage.js";
 import "./DmesgPage.js";
 import "./ConsolePage.js";
 import "./ActivitiesPage.js";
+import "./ActivitiesEditor.js";
 import "./NotFoundPage.js";
 
 // Main application

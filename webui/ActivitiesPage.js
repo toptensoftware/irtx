@@ -1,5 +1,6 @@
 import { Component, css, router, $ } from "@codeonlyjs/core";
 import { config } from "./config.js";
+import { pack } from "@toptensoftware/binpack";
 
 export class ActivitiesPage extends Component
 {
