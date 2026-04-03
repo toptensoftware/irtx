@@ -1,9 +1,12 @@
 const config = {
     development: {
         bundleFree: {
-            modules: [ 
+            modules: [
                 "@codeonlyjs/core",
                 "@toptensoftware/binpack",
+                "codemirror",
+                "@codemirror/lang-javascript",
+                "@lezer/highlight",
             ],
             replace: [
                 { from: "./Main.js", to: "/Main.js" },

@@ -1,43 +1,53 @@
 import { Component, css, router, $ } from "@codeonlyjs/core";
 import { config } from "./config.js";
 import { pack, registerType, registerEnum } from "@toptensoftware/binpack";
+import { basicSetup } from "codemirror";
+import { EditorView, keymap, ViewPlugin, Decoration } from "@codemirror/view";
+import { EditorState, Compartment, RangeSetBuilder } from "@codemirror/state";
+import { indentMore, indentLess } from "@codemirror/commands";
+import { javascript } from "@codemirror/lang-javascript";
+import { HighlightStyle, syntaxHighlighting, indentUnit } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 
-// Combined binary file format constants (from @toptensoftware/binpack/cli.js)
-const BPAK_SIGNATURE = 0x4B415042;  // "BPAK"
-const BPAK_VERSION = 1;
+// ---------------------------------------------------------------------------
+// Combined binary file format (mirrors @toptensoftware/binpack/cli.js)
+// ---------------------------------------------------------------------------
+
+const BPAK_SIGNATURE  = 0x4B415042;  // "BPAK"
+const BPAK_VERSION    = 1;
 const BPAK_HEADER_SIZE = 32;
 
 function buildCombinedBuffer({ binary, relocations })
 {
     const relocTableOffset = BPAK_HEADER_SIZE + binary.length;
-    const buf = new Uint8Array(relocTableOffset + relocations.length * 4);
+    const buf  = new Uint8Array(relocTableOffset + relocations.length * 4);
     const view = new DataView(buf.buffer);
 
-    view.setUint32(0, BPAK_SIGNATURE, true);
-    view.setUint32(4, BPAK_VERSION, true);
-    view.setUint32(8, relocations.length, true);
-    view.setUint32(12, relocTableOffset, true);
-    // bytes 16-31: zero (no base relocation)
+    view.setUint32(0,  BPAK_SIGNATURE,        true);
+    view.setUint32(4,  BPAK_VERSION,           true);
+    view.setUint32(8,  relocations.length,     true);
+    view.setUint32(12, relocTableOffset,       true);
 
     buf.set(binary, BPAK_HEADER_SIZE);
 
-    // Adjust all pointer fields by HEADER_SIZE and write relocation table
     const delta = BigInt(BPAK_HEADER_SIZE);
     for (let i = 0; i < relocations.length; i++)
     {
         const fileOffset = relocations[i] + BPAK_HEADER_SIZE;
         const ptr = BigInt(view.getUint32(fileOffset, true));
-        view.setUint32(fileOffset, Number((ptr + delta) & 0xFFFFFFFFn), true);
-        view.setUint32(relocTableOffset + i * 4, fileOffset, true);
+        view.setUint32(fileOffset,                  Number((ptr + delta) & 0xFFFFFFFFn), true);
+        view.setUint32(relocTableOffset + i * 4,    fileOffset,                          true);
     }
 
     return buf;
 }
 
-// Module-level cache: types only need to be registered once per session.
-// binpackBlobUrl is kept alive so activities.js can import from it.
-let binpackBlobUrl = null;
-let registeredRootType = null;
+// ---------------------------------------------------------------------------
+// Binpack type registration cache
+// ---------------------------------------------------------------------------
+
+let binpackBlobUrl      = null;
+let registeredRootType  = null;
 
 async function ensureBinpackTypes(deviceUrl)
 {
@@ -49,10 +59,9 @@ async function ensureBinpackTypes(deviceUrl)
         throw new Error(`Failed to fetch type definitions: HTTP ${r.status}`);
 
     const source = await r.text();
-    const blob = new Blob([source], { type: "application/javascript" });
-    const url = URL.createObjectURL(blob);
-
-    const mod = await import(url);
+    const blob   = new Blob([source], { type: "application/javascript" });
+    const url    = URL.createObjectURL(blob);
+    const mod    = await import(url);
     const typeDefs = mod.default;
 
     if (!Array.isArray(typeDefs) || typeDefs.length === 0)
@@ -71,35 +80,226 @@ async function ensureBinpackTypes(deviceUrl)
         }
         catch (e)
         {
-            // Ignore "already registered" errors (e.g. page revisited within session)
             if (!e.message?.includes("already registered")) throw e;
         }
     }
 
-    binpackBlobUrl = url;   // keep alive so activities.js blob imports resolve
+    binpackBlobUrl = url;
 }
+
+// ---------------------------------------------------------------------------
+// Whitespace visualisation
+// ---------------------------------------------------------------------------
+
+const spaceDeco = Decoration.mark({ class: "cm-vis-space" });
+const tabDeco   = Decoration.mark({ class: "cm-vis-tab" });
+
+function buildWhitespaceDeco(view)
+{
+    const builder = new RangeSetBuilder();
+    for (const { from, to } of view.visibleRanges)
+    {
+        const text = view.state.doc.sliceString(from, to);
+        for (let i = 0; i < text.length; i++)
+        {
+            if (text[i] === " ")       builder.add(from + i, from + i + 1, spaceDeco);
+            else if (text[i] === "\t") builder.add(from + i, from + i + 1, tabDeco);
+        }
+    }
+    return builder.finish();
+}
+
+const showWhitespace = ViewPlugin.fromClass(
+    class {
+        constructor(view)  { this.decorations = buildWhitespaceDeco(view); }
+        update(update)     {
+            if (update.docChanged || update.viewportChanged)
+                this.decorations = buildWhitespaceDeco(update.view);
+        }
+    },
+    { decorations: v => v.decorations }
+);
+
+// ---------------------------------------------------------------------------
+// CodeMirror theme helpers
+// ---------------------------------------------------------------------------
+
+// Syntax highlight styles.  Colors chosen to match VS Code Dark+ / Light+.
+const darkHighlight = HighlightStyle.define([
+    { tag: tags.keyword,                            color: "#569cd6" },
+    { tag: tags.string,                             color: "#ce9178" },
+    { tag: tags.comment,                            color: "#6a9955", fontStyle: "italic" },
+    { tag: tags.number,                             color: "#b5cea8" },
+    { tag: [tags.bool, tags.null],                  color: "#569cd6" },
+    { tag: tags.propertyName,                       color: "#9cdcfe" },
+    { tag: tags.function(tags.variableName),        color: "#dcdcaa" },
+    { tag: tags.definition(tags.variableName),      color: "#4fc1ff" },
+    { tag: tags.className,                          color: "#4ec9b0" },
+    { tag: tags.operator,                           color: "#d4d4d4" },
+    { tag: tags.punctuation,                        color: "#d4d4d4" },
+]);
+
+const lightHighlight = HighlightStyle.define([
+    { tag: tags.keyword,                            color: "#0000ff" },
+    { tag: tags.string,                             color: "#a31515" },
+    { tag: tags.comment,                            color: "#008000", fontStyle: "italic" },
+    { tag: tags.number,                             color: "#098658" },
+    { tag: [tags.bool, tags.null],                  color: "#0000ff" },
+    { tag: tags.propertyName,                       color: "#001080" },
+    { tag: tags.function(tags.variableName),        color: "#795e26" },
+    { tag: tags.definition(tags.variableName),      color: "#001080" },
+    { tag: tags.className,                          color: "#267f99" },
+]);
+
+// Build the set of CM6 extensions that control theme + highlight for the
+// current dark-mode state.  Reading CSS vars at call time means we always
+// pick up the correct resolved values.
+function makeThemeExtensions(isDark)
+{
+    const style    = getComputedStyle(document.documentElement);
+    const bodyBg   = style.getPropertyValue("--body-back-color").trim();
+    const bodyFg   = style.getPropertyValue("--body-fore-color").trim();
+    const inputBg  = style.getPropertyValue("--input-back-color").trim();
+    const gridline = style.getPropertyValue("--gridline-color").trim();
+    const accent   = style.getPropertyValue("--accent-color").trim();
+
+    return [
+        EditorView.darkTheme.of(isDark),
+        EditorView.theme({
+            "&":                            { backgroundColor: inputBg, color: bodyFg, height: "100%" },
+            "&.cm-focused":                 { outline: "none" },
+            ".cm-scroller":                 { fontFamily: "monospace", fontSize: "0.85rem", lineHeight: "1.6" },
+            ".cm-content":                  { caretColor: bodyFg },
+            ".cm-cursor":                   { borderLeftColor: bodyFg },
+            ".cm-selectionBackground, &.cm-focused .cm-selectionBackground":
+                                            { backgroundColor: `${accent}40` },
+            ".cm-gutters":                  { backgroundColor: bodyBg, color: `${bodyFg}80`,
+                                              border: "none", borderRight: `1px solid ${gridline}` },
+            ".cm-activeLineGutter":         { backgroundColor: `${bodyFg}12` },
+            ".cm-activeLine":               { backgroundColor: `${bodyFg}08` },
+            ".cm-matchingBracket":          { outline: `1px solid ${accent}80`, borderRadius: "2px" },
+
+            // Whitespace visualisation — dots for spaces, tick for tabs
+            ".cm-vis-space":  {
+                backgroundImage: `radial-gradient(circle at center, ${bodyFg}50 1.2px, transparent 1.2px)`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center 60%",
+                backgroundSize: "100% 100%",
+            },
+            ".cm-vis-tab":    { position: "relative" },
+        }, { dark: isDark }),
+        // syntaxHighlighting without { fallback:true } takes precedence over
+        // basicSetup's syntaxHighlighting(defaultHighlightStyle, { fallback:true })
+        syntaxHighlighting(isDark ? darkHighlight : lightHighlight),
+    ];
+}
+
+// Tab: with a selection indent the selected lines; otherwise insert enough
+// spaces to advance the cursor to the next 4-column tab stop.
+function smartTab({ state, dispatch })
+{
+    if (!state.selection.main.empty)
+        return indentMore({ state, dispatch });
+
+    const { from } = state.selection.main;
+    const col    = from - state.doc.lineAt(from).from;
+    const spaces = " ".repeat(4 - (col % 4));
+    dispatch(state.update(state.replaceSelection(spaces), {
+        scrollIntoView: true,
+        userEvent: "input",
+    }));
+    return true;
+}
+
+
+// ---------------------------------------------------------------------------
+// ActivitiesEditor component
+// ---------------------------------------------------------------------------
 
 export class ActivitiesEditor extends Component
 {
-    source = "";
-    busy = false;
-    result = null;
+    source      = "";
+    busy        = false;
+    result      = null;
+
+    #editorView         = null;
+    #themeCompartment   = new Compartment();
+    #onThemeChange      = null;
 
     constructor()
     {
         super();
+
+        // Clean up the CM6 editor and theme listener when navigating away
+        const onDidEnter = (from, to) => {
+            if (to.page !== this)
+            {
+                this.#destroyEditor();
+                router.removeEventListener("didEnter", onDidEnter);
+            }
+        };
+        router.addEventListener("didEnter", onDidEnter);
+
         this.doLoad();
     }
 
-    onInput(ev)
+    // CodeOnly calls `this.editorContainer = el` when the bind resolves.
+    // We use a setter so we can mount CM6 as soon as the element is ready.
+    #editorContainer = null;
+    get editorContainer() { return this.#editorContainer; }
+    set editorContainer(el)
     {
-        this.source = ev.target.value;
+        this.#editorContainer = el;
+        if (el && !this.#editorView)
+            this.#mountEditor(el);
+    }
+
+    #mountEditor(el)
+    {
+        const isDark = window.stylish?.darkMode ?? false;
+
+        this.#editorView = new EditorView({
+            state: EditorState.create({
+                doc: this.source,
+                extensions: [
+                    basicSetup,
+                    indentUnit.of("    "),
+                    keymap.of([{ key: "Tab", run: smartTab }, { key: "Shift-Tab", run: indentLess }]),
+                    showWhitespace,
+                    javascript(),
+                    this.#themeCompartment.of(makeThemeExtensions(isDark)),
+                    EditorView.updateListener.of(update => {
+                        if (update.docChanged)
+                            this.source = update.state.doc.toString();
+                    }),
+                ],
+            }),
+            parent: el,
+        });
+
+        this.#onThemeChange = (e) => {
+            this.#editorView?.dispatch({
+                effects: this.#themeCompartment.reconfigure(makeThemeExtensions(e.darkMode)),
+            });
+        };
+        window.stylish?.addEventListener("darkModeChanged", this.#onThemeChange);
+    }
+
+    #destroyEditor()
+    {
+        if (this.#onThemeChange)
+        {
+            window.stylish?.removeEventListener("darkModeChanged", this.#onThemeChange);
+            this.#onThemeChange = null;
+        }
+        this.#editorView?.destroy();
+        this.#editorView = null;
     }
 
     async doLoad()
     {
         if (this.busy) return;
-        this.busy = true;
+        this.busy   = true;
         this.result = null;
         this.invalidate();
 
@@ -112,10 +312,14 @@ export class ActivitiesEditor extends Component
             const text = await r.text();
             this.source = text;
 
-            // textArea is bound to the DOM element; set its value directly so
-            // the textarea displays the loaded content.
-            if (this.textArea)
-                this.textArea.value = text;
+            // If the editor is already mounted, update its document
+            if (this.#editorView)
+            {
+                const state = this.#editorView.state;
+                this.#editorView.dispatch({
+                    changes: { from: 0, to: state.doc.length, insert: text },
+                });
+            }
         }
         catch (e)
         {
@@ -131,25 +335,26 @@ export class ActivitiesEditor extends Component
     async doSave()
     {
         if (this.busy) return;
-        this.busy = true;
+        this.busy   = true;
         this.result = null;
         this.invalidate();
 
         try
         {
-            // Fetch and register type definitions from the device (once per session)
             await ensureBinpackTypes(config.deviceUrl);
 
-            // Rewrite any "binpack:types" imports in activities.js to point at the
-            // blob URL we already have for the device's binpack.js module.
-            const activitiesSource = this.source.replace(
+            // Read current text from editor (or source property if editor isn't up yet)
+            const currentSource = this.#editorView
+                ? this.#editorView.state.doc.toString()
+                : this.source;
+
+            const activitiesSource = currentSource.replace(
                 /from\s+["']binpack:types["']/g,
                 `from "${binpackBlobUrl}"`
             );
 
-            // Dynamically import the activities data from a temporary blob URL
             const activitiesBlob = new Blob([activitiesSource], { type: "application/javascript" });
-            const activitiesUrl = URL.createObjectURL(activitiesBlob);
+            const activitiesUrl  = URL.createObjectURL(activitiesBlob);
             let data;
             try
             {
@@ -164,11 +369,9 @@ export class ActivitiesEditor extends Component
             if (data == null)
                 throw new Error("activities.js must export a default value");
 
-            // Pack to binary and wrap in the BPAK combined-file format
             const packResult = pack(registeredRootType, data);
-            const binary = buildCombinedBuffer(packResult);
+            const binary     = buildCombinedBuffer(packResult);
 
-            // Upload helper
             const postFile = async (data, filename, mimeType = "application/octet-stream") => {
                 const form = new FormData();
                 form.append("file", new Blob([data], { type: mimeType }), filename);
@@ -180,7 +383,7 @@ export class ActivitiesEditor extends Component
                     throw new Error(`Upload of ${filename} failed: HTTP ${r.status}`);
             };
 
-            await postFile(new TextEncoder().encode(this.source), "activities.js", "application/javascript");
+            await postFile(new TextEncoder().encode(currentSource), "activities.js", "application/javascript");
             await postFile(binary, "activities.bin");
 
             const r = await fetch(`${config.deviceUrl}/api/reload-activities`, { method: "POST" });
@@ -195,7 +398,7 @@ export class ActivitiesEditor extends Component
         }
         finally
         {
-            this.busy = false;
+            this.busy   = false;
             this.invalidate();
         }
     }
@@ -228,10 +431,8 @@ export class ActivitiesEditor extends Component
                 ]
             },
             {
-                type: "textarea .editor",
-                attr_spellcheck: "false",
-                bind: "textArea",
-                on_input: "onInput",
+                type: "div .editor-container",
+                bind: "editorContainer",
             },
             {
                 if: c => c.result !== null,
@@ -285,19 +486,33 @@ css`
         }
     }
 
-    .editor
+    .editor-container
     {
         flex: 1;
-        resize: none;
-        font-family: monospace;
-        font-size: 0.85rem;
-        padding: 8px;
-        box-sizing: border-box;
-        width: 100%;
-        background-color: var(--back-color);
-        color: var(--body-fore-color);
+        overflow: hidden;
         border: 1px solid var(--gridline-color);
         border-radius: 4px;
+
+        /* CM6 mounts a .cm-editor div inside; make it fill the container */
+        .cm-editor
+        {
+            height: 100%;
+        }
+
+        .cm-scroller
+        {
+            overflow: auto;
+        }
+
+        .cm-vis-tab::before
+        {
+            content: '→';
+            position: absolute;
+            left: 1px;
+            opacity: 0.35;
+            line-height: inherit;
+            pointer-events: none;
+        }
     }
 
     .editor-result

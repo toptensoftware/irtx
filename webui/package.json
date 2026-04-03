@@ -11,9 +11,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@codemirror/lang-javascript": "^6.2.5",
     "@codeonlyjs/core": "codeonlyjs/core#semver:^0.1",
     "@codeonlyjs/coserv": "github:codeonlyjs/coserv",
-    "@toptensoftware/binpack": "github:toptensoftware/binpack"
+    "@lezer/highlight": "^1.2.3",
+    "@toptensoftware/binpack": "github:toptensoftware/binpack",
+    "codemirror": "^6.0.2"
   },
   "devDependencies": {
     "@codeonlyjs/cogent": "github:codeonlyjs/cogent",

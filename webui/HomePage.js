@@ -84,88 +84,6 @@ export class HomePage extends Component
                         ]
                     },
 
-                    // WiFi
-                    $.h2("WiFi"),
-                    {
-                        type: "table",
-                        class: "kv-table",
-                        $: [
-                            { type: "tr", $: [$.th("Mode"),      { type: "td", text: c => c.status.wifi.mode }] },
-                            { type: "tr", $: [$.th("SSID"),      { type: "td", text: c => c.status.wifi.ssid }] },
-                            { type: "tr", $: [$.th("Connected"), { type: "td", text: c => c.status.wifi.connected ? "Yes" : "No" }] },
-                            { type: "tr", $: [$.th("IP"),        { type: "td", text: c => c.status.wifi.ip }] },
-                            { type: "tr", $: [$.th("Gateway"),   { type: "td", text: c => c.status.wifi.gateway }] },
-                            { type: "tr", $: [$.th("RSSI"),      { type: "td", text: c => `${c.status.wifi.rssi} dBm` }] },
-                            { type: "tr", $: [$.th("MAC"),       { type: "td", text: c => c.status.wifi.mac }] },
-                            { type: "tr", $: [$.th("UDP Port"),  { type: "td", text: c => String(c.status.wifi.udp_port) }] },
-                        ]
-                    },
-
-                    // GPIO
-                    $.h2("GPIO"),
-                    {
-                        type: "table",
-                        class: "kv-table",
-                        $: [
-                            { type: "tr", $: [$.th("IR TX Pin"),  { type: "td", text: c => String(c.status.gpio.irtx_pin) }] },
-                            { type: "tr", $: [$.th("IR RX Pin"),  { type: "td", text: c => c.status.gpio.irrx_pin === -1 ? "disabled" : String(c.status.gpio.irrx_pin) }] },
-                            { type: "tr", $: [$.th("LED Pin"),    { type: "td", text: c => String(c.status.gpio.led_pin) }] },
-                            { type: "tr", $: [$.th("LED Order"),  { type: "td", text: c => c.status.gpio.led_order }] },
-                            { type: "tr", $: [$.th("Pullup"),     { type: "td", text: c => c.formatPins(c.status.gpio.pullup) }] },
-                            { type: "tr", $: [$.th("Pulldown"),   { type: "td", text: c => c.formatPins(c.status.gpio.pulldown) }] },
-                        ]
-                    },
-
-                    // Protocols
-                    $.h2("Protocols"),
-                    {
-                        type: "table",
-                        class: "data-table",
-                        $: [
-                            {
-                                type: "thead",
-                                $: { type: "tr", $: [$.th("Name"), $.th("ID"), $.th("Bits")] }
-                            },
-                            {
-                                type: "tbody",
-                                $: {
-                                    foreach: c => c.status.protocols,
-                                    type: "tr",
-                                    $: [
-                                        { type: "td", text: p => p.name },
-                                        { type: "td", text: p => p.id },
-                                        { type: "td", text: p => String(p.bits) },
-                                    ]
-                                }
-                            }
-                        ]
-                    },
-
-                    // BLE
-                    $.h2("BLE"),
-                    {
-                        type: "table",
-                        class: "data-table",
-                        $: [
-                            {
-                                type: "thead",
-                                $: { type: "tr", $: [$.th("Slot"), $.th("ID"), $.th("Peer")] }
-                            },
-                            {
-                                type: "tbody",
-                                $: {
-                                    foreach: c => c.status.ble,
-                                    type: "tr",
-                                    $: [
-                                        { type: "td", text: b => String(b.slot) },
-                                        { type: "td", text: b => b.id },
-                                        { type: "td", text: b => b.peer ?? "—" },
-                                    ]
-                                }
-                            }
-                        ]
-                    },
-
                     // Activities
                     $.h2("Activities"),
                     {
@@ -216,6 +134,89 @@ export class HomePage extends Component
                             }
                         ]
                     },
+
+                    // WiFi
+                    $.h2("WiFi"),
+                    {
+                        type: "table",
+                        class: "kv-table",
+                        $: [
+                            { type: "tr", $: [$.th("Mode"),      { type: "td", text: c => c.status.wifi.mode }] },
+                            { type: "tr", $: [$.th("SSID"),      { type: "td", text: c => c.status.wifi.ssid }] },
+                            { type: "tr", $: [$.th("Connected"), { type: "td", text: c => c.status.wifi.connected ? "Yes" : "No" }] },
+                            { type: "tr", $: [$.th("IP"),        { type: "td", text: c => c.status.wifi.ip }] },
+                            { type: "tr", $: [$.th("Gateway"),   { type: "td", text: c => c.status.wifi.gateway }] },
+                            { type: "tr", $: [$.th("RSSI"),      { type: "td", text: c => `${c.status.wifi.rssi} dBm` }] },
+                            { type: "tr", $: [$.th("MAC"),       { type: "td", text: c => c.status.wifi.mac }] },
+                            { type: "tr", $: [$.th("UDP Port"),  { type: "td", text: c => String(c.status.wifi.udp_port) }] },
+                        ]
+                    },
+
+                    // BLE
+                    $.h2("BLE"),
+                    {
+                        type: "table",
+                        class: "data-table",
+                        $: [
+                            {
+                                type: "thead",
+                                $: { type: "tr", $: [$.th("Slot"), $.th("ID"), $.th("Peer")] }
+                            },
+                            {
+                                type: "tbody",
+                                $: {
+                                    foreach: c => c.status.ble,
+                                    type: "tr",
+                                    $: [
+                                        { type: "td", text: b => String(b.slot) },
+                                        { type: "td", text: b => b.id },
+                                        { type: "td", text: b => b.peer ?? "—" },
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+
+                    // GPIO
+                    $.h2("GPIO"),
+                    {
+                        type: "table",
+                        class: "kv-table",
+                        $: [
+                            { type: "tr", $: [$.th("IR TX Pin"),  { type: "td", text: c => String(c.status.gpio.irtx_pin) }] },
+                            { type: "tr", $: [$.th("IR RX Pin"),  { type: "td", text: c => c.status.gpio.irrx_pin === -1 ? "disabled" : String(c.status.gpio.irrx_pin) }] },
+                            { type: "tr", $: [$.th("LED Pin"),    { type: "td", text: c => String(c.status.gpio.led_pin) }] },
+                            { type: "tr", $: [$.th("LED Order"),  { type: "td", text: c => c.status.gpio.led_order }] },
+                            { type: "tr", $: [$.th("Pullup"),     { type: "td", text: c => c.formatPins(c.status.gpio.pullup) }] },
+                            { type: "tr", $: [$.th("Pulldown"),   { type: "td", text: c => c.formatPins(c.status.gpio.pulldown) }] },
+                        ]
+                    },
+
+                    // Protocols
+                    $.h2("Protocols"),
+                    {
+                        type: "table",
+                        class: "data-table",
+                        $: [
+                            {
+                                type: "thead",
+                                $: { type: "tr", $: [$.th("Name"), $.th("ID"), $.th("Bits")] }
+                            },
+                            {
+                                type: "tbody",
+                                $: {
+                                    foreach: c => c.status.protocols,
+                                    type: "tr",
+                                    $: [
+                                        { type: "td", text: p => p.name },
+                                        { type: "td", text: p => p.id },
+                                        { type: "td", text: p => String(p.bits) },
+                                    ]
+                                }
+                            }
+                        ]
+                    },
+
                 ]
             }
         ]
