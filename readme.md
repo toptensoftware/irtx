@@ -4,10 +4,9 @@ An open source flexible firmware for ESP32 based Infrared transmitter/receivers.
 
 irtx can act as a dumb blaster:
 
-* Receive IR commands over UDP and transmits using an attached IR transmitter circuit
-* Accepts either raw timing data, or NEC or Panasonic encoded values
+* Receive IR commands over UDP and transmit using an attached IR transmitter circuit
+* Accept either raw timing data, or NEC or Panasonic encoded values
 * Pair with up to 4 BLE devices to send keyboard, mouse or consumer control HID packets
-* Configuration and monitoring via serial or telnet
 
 irtx can also act as a smart device listening for particular actions and invoking actions
 
@@ -15,6 +14,8 @@ irtx can also act as a smart device listening for particular actions and invokin
 * Handle input events from GPIO attached buttons and rotary encoders
 * Invoke sequences of operations in response to IR or GPIO input actions
 * Manage a set of "activities" and switch between them
+
+Configuration by serial, telnet or web.
 
 An accompanying NodeJS library [irtx-node](https://github.com/toptensoftware/irtx-node) can 
 be used to programatically control the device (eg: send IR codes).  It also provides
@@ -49,10 +50,11 @@ The firmware for the esp32 is an Arduino project.  To build
     #arduino-cli lib install "NimBLE-Arduino"
     ```
 
+    (currently requires a dev branch build of NimBLE)
+
 4. Build
 
     ```bash
-    cd firmware
     ./build --build c3
     ```
 
@@ -68,14 +70,143 @@ Alternatively, you can build and flash in one command:
 ./build c3 com8
 ```
 
-The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.  N
+The firmware also supportes esp32-c6 by passing "c6" instead of "c3" to the build command.
 
+
+
+## Activities
+
+Besides acting as a dumb IR blaster, irtx can also manage a set of "activities". 
+
+The activities system supports:
+
+* A set of devices each with a list of operations for turning the device on and off
+* A set of activities each of which defines 
+    - a set of required devices (which will be turned on, others will be turned off) 
+    - a set of operations to and invoke when the activity is switch to, and away from
+    - a set of bindings that map input actions (GPIO or received IR commands) to a 
+      sequence of operations.
+
+Available operations include:
+
+- Send an IR code
+- Send a Wake on Lan packet
+- Make an HTTP GET or POST request
+- Send a UDP packet
+- Delay
+- Set the onboard LED
+- Switch activities
+- Search for a string in a HTTP GET response
+- Perform a conditional set of instructions depending on string match
+
+Unlike device configuration which is done via the console and stored in NVS on the device, activity
+definitions are compiled from JSON like definitions and uploaded as binary packed data.
+
+The activity definitions can edited either:
+
+* directly in the web UI, or http://my-irtx/activity-editor
+* compiled and uploaded using the [node-irtx](https://github.com/toptensoftware/irtx-node) command line tool.
+
+eg: 
+```
+npx toptensoftware/irtx-node -h my-irtx activites my-activities.js
+```
+
+Here's an example activities configuration file (intended for illustration only)
+
+```js
+import { op } from "irtx:binpack";
+
+// IR Codes
+let ircodes = {
+    tvOn: "NEC:0x20dfb34c",
+    tvOff: "NEC:0x20dfa35c",
+    volumeUp: "PANA:0x400401000405",
+    volumeDown: "PANA:0x400401008485",
+    ///etc...
+}
+
+// Base URL for Yamaha receiver
+const yamaUrl = "http://10.1.1.125/YamahaExtendedControl/v1";
+
+// Main Config
+const confg = {
+    version: 1,
+    devices: [
+        { 
+            // TV Device
+            name: "tv", 
+            turnOn: op.sendIr(ircodes.tvOn),
+            turnOff: op.sendIr(ircodes.tvOff)
+        },
+        {
+            // Yamaha Receiver Device
+            name: "receiver", 
+            turnOn: op.httpGet(yamaUrl + "/main/setPower?power=on"),
+            turnOff: op.httpGet(yamaUrl + "/main/setPower?power=standby"),
+        }
+    ],
+    activities: [
+        {
+            name: "off",
+            devices: [ /* no devices, turn everything off */ ],
+        },
+        {
+            // Watch TV activity
+            name: "watchTv",
+
+            // Required devices
+            devices: [ "tv", "receiver", ],
+
+            // Actions to invoke when this activity is activated/deactivated
+            //didDeactivate: [ ],
+            didActivate: op.httpGet(yamaUrl + "/main/setInput?input=hdmi1"),
+            //willActivate: [ ],
+            //willDeactivate: [ ],
+
+            // Bindings
+            bindings: [
+                {
+                    // Volume up
+                    on: ircodes.volumeUp,
+                    do: op.httpGet(recUrl +"/main/setVolume?volume=up"),
+                },
+                {
+                    // Volume down
+                    on: ircodes.volumeDown,
+                    do: op.httpGet(recUrl +"/main/setVolume?volume=down"),
+                },
+            ]
+        },
+        {
+            // Activity 2 etc...
+        }
+    ]
+}
+
+// The root configuration must be the default export
+export default config;
+
+```
 
 
 ## Configuring the Device
 
-Use a serial monitor program (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure the device.  The 
-following serial terminal commands are available:
+Wifi needs to be configured through serial terminal program.  Once Wifi is enabled, all other
+configuration can be done through serial, telnet or via the built-in web based terminal.
+
+To setup Wifi, use a serial monitor program (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure the device.  Use the `setwifi` command to setup connection to your Wifi network.
+
+Alternatively you can configure the device to act as a Wifi Access Point using the `setap` command, 
+however since AP mode can only be entered using a boot pin configuration you also need a physical 
+button on the device and it needs to be configured using the `gpio` and `setbootpin` commands.
+
+Once Wifi or AP mode is active, you can use telnet or the built-in web UI to configure the rest
+of the device using the console commands described below.
+
+## Console Commands
+
+The following console commands are available via serial, telnet or using the web UI.
 
  *   `name <devicename>`                  - set device name, takes effect after restart
  *   `setwifi <ssid> <password>`          - configure WiFi credentials and reconnect
@@ -95,6 +226,8 @@ following serial terminal commands are available:
  *   `reboot`                             - reboot the device
  *   `dmesg`                              - displays the message log (up to 50 past logged messages)
  *   `help`                               - list all commands
+
+## Configuring GPIO Pins
 
 By default, no GPIO pins are configured.
 
@@ -129,17 +262,16 @@ To set a rotary encoder input, pass the A/B pin pair:
 gpio 12 13 pulldown
 ```
 
-Note: button and encoder inputs don't do anything unless also configured in the activities configuration to
-perform operations.
-
+Note: button and encoder inputs don't do anything unless also configured in the activities 
+configuration to perform operations.
 
 
 ## Access Point Mode
 
-The device can be started in WiFi access point (AP) mode for configuration via telnet or HTTP without
+The device can be started in WiFi access point (AP) mode for configuration via telnet or web without
 needing to connect to an existing network.
 
-1. Configure the AP SSID (and optionally a password, default is `irtx`):
+1. Configure the AP SSID (and optionally a password, default is `irtx1234`):
 
     ```
     setap mydevice-ap
@@ -153,13 +285,15 @@ needing to connect to an existing network.
     setbootpin 9
     ```
 
-3. Hold the pin pressed and power on (or reboot) the device. The status LED will turn yellow
-   to confirm AP mode is active.
+3. Press the attached button while powering on the device. The status LED (if configured) will turn 
+   yellow to confirm AP mode is active.
 
 4. On your computer or phone, connect to the WiFi network matching the AP SSID you configured,
-   using the AP password (default: `irtx`).
+   using the AP password.
 
-5. Telnet to `192.168.4.1` to access the device terminal and reconfigure as needed.
+5. Either: 
+    * telnet to `192.168.4.1` to access the device terminal
+    * visit `http://192.168.4.1` and use the console tab 
 
 Two pins can be specified with `setbootpin` — both must be pressed simultaneously at boot to trigger
 AP mode (useful to avoid accidental triggers).
@@ -168,10 +302,11 @@ AP mode (useful to avoid accidental triggers).
 
 ## Telnet Support
 
-Once wifi is enabled and working you can also use telnet (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure 
-and monitor the device with the same commands as above.
+Once wifi is enabled and working you can use telnet (eg: [ttsm](https://github.com/toptensoftware/ttsm)) to configure and monitor the device using the same commands as above.
 
 Note: only one telnet client can connect at a time.
+
+
 
 ## Pairing BLE Devices
 
@@ -359,118 +494,6 @@ The following files have special meaning:
 | `/binpack.js` | firmware (built-in) | Type definitions used to compile `activities.js` into `activities.bin` (fetched by the CLI at upload time) |
 
 `/activities.js` and `/activities.bin` are kept in sync by the upload workflow — the CLI and web UI both upload both files together and then call `/api/reload-activities`.
-
-
-
-## Activities
-
-Besides acting as a dumb IR blaster, irtx can also manage a set of "activities".  
-
-The activities system supports:
-
-* A set of device definitions each with a list of operations for turning the device on and off
-* A set of activity definitions each of which defines a set of required devices (which will be turned on, 
-  others will be turned off), a set of activate and deactivate operations and a set of bindings that 
-  map input actions to a sequence of operations.
-
-A sequence of operations can include:
-
-- Send an IR code
-- Send a Wake on Lan packet
-- Make an HTTP GET or POST request
-- Send a UDP packet
-- Delay
-- Set the onboard LED
-- Switch activities
-- Search for a string in a HTTP GET response
-- Perform a conditional set of instructions depending on string match
-
-Unlike device configuration which is done via serial/telnet and stored in NVS on the device, activity
-definitions are compiled from JSON like definition into a binary packed file and uploaded to the device
-via http using the [node-irtx](https://github.com/toptensoftware/irtx-node) command line tool.
-
-eg:
-
-```
-npx toptensoftware/irtx-node configure my-activities.js
-```
-
-Here's an example activities configuration file (intended for illustration only)
-
-```js
-import { op } from "irtx:binpack";
-
-// IR Codes
-let ircodes = {
-    tvOn: "NEC:0x20dfb34c",
-    tvOff: "NEC:0x20dfa35c",
-    volumeUp: "PANA:0x400401000405",
-    volumeDown: "PANA:0x400401008485",
-    ///etc...
-}
-
-// Base URL for Yamaha receiver
-const yamaUrl = "http://10.1.1.125/YamahaExtendedControl/v1";
-
-// Main Config
-const confg = {
-    version: 1,
-    devices: [
-        { 
-            // TV Device
-            name: "tv", 
-            turnOn: op.sendIr(ircodes.tvOn),
-            turnOff: op.sendIr(ircodes.tvOff)
-        },
-        {
-            // Yamaha Receiver Device
-            name: "receiver", 
-            turnOn: op.httpGet(yamaUrl + "/main/setPower?power=on"),
-            turnOff: op.httpGet(yamaUrl + "/main/setPower?power=standby"),
-        }
-    ],
-    activities: [
-        {
-            name: "off",
-            devices: [ /* no devices, turn everything off */ ],
-        },
-        {
-            // Watch TV activity
-            name: "watchTv",
-
-            // Required devices
-            devices: [ "tv", "receiver", ],
-
-            // Actions to invoke when this activity is activated/deactivated
-            //didDeactivate: [ ],
-            didActivate: op.httpGet(yamaUrl + "/main/setInput?input=hdmi1"),
-            //willActivate: [ ],
-            //willDeactivate: [ ],
-
-            // Bindings
-            bindings: [
-                {
-                    // Volume up
-                    on: ircodes.volumeUp,
-                    do: op.httpGet(recUrl +"/main/setVolume?volume=up"),
-                },
-                {
-                    // Volume down
-                    on: ircodes.volumeDown,
-                    do: op.httpGet(recUrl +"/main/setVolume?volume=down"),
-                },
-            ]
-        },
-        {
-            // Activity 2 etc...
-        }
-    ]
-}
-
-// The root configuration must be the default export
-export default config;
-
-```
 
 
 
