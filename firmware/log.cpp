@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include <lwip/sockets.h>
 #include <stdarg.h>
 #include "log.h"
+#include "console.h"
 
 // ---- JSON string helper ----
 
@@ -23,22 +23,6 @@ void printJsonString(const char* s)
     printWrite("%s", buf);
 }
 
-// ---- Capture buffer ----
-
-static String* captureBuffer = nullptr;
-
-void logStartCapture(String* buf) { captureBuffer = buf; }
-void logEndCapture()              { captureBuffer = nullptr; }
-
-// ---- Telnet fan-out ----
-
-static int telnetFd = -1;
-
-void logSetTelnetFd(int fd)
-{
-    telnetFd = fd;
-}
-
 // ---- dmesg ring buffer ----
 
 #define DMESG_LINES 50
@@ -48,7 +32,6 @@ static char dmesgRing[DMESG_LINES][DMESG_WIDTH];
 static int  dmesgHead  = 0;   // next slot to write
 static int  dmesgCount = 0;   // entries stored (saturates at DMESG_LINES)
 
-// Accumulate characters into a line; commit to ring on '\n'
 static char dmesgAccum[DMESG_WIDTH];
 static int  dmesgAccumLen = 0;
 
@@ -76,6 +59,9 @@ static void dmesgFeed(const char* buf, size_t len)
     }
 }
 
+// Replay the ring buffer to the active console only (PRINT path).
+// Uses consolePrint rather than consoleWriteAll so replayed lines are not
+// re-stored in dmesgFeed, and the output goes only to the requesting console.
 void dmesgPrint()
 {
     int start = (dmesgCount < DMESG_LINES) ? 0 : dmesgHead;
@@ -83,42 +69,12 @@ void dmesgPrint()
     for (int i = 0; i < count; i++)
     {
         const char* line = dmesgRing[(start + i) % DMESG_LINES];
-        // Use logWriteRaw (not logWrite) to avoid re-storing replayed lines in dmesgFeed
-        logWriteRaw(line, strlen(line));
-        logWriteRaw("\n", 1);
+        consolePrint(line, strlen(line));
+        consolePrint("\n", 1);
     }
 }
 
 // ---- Core output ----
-
-void logWriteRaw(const char* buf, size_t len)
-{
-    if (captureBuffer)
-        captureBuffer->concat(buf, (unsigned int)len);
-
-    Serial.write((const uint8_t*)buf, len);
-
-    if (telnetFd < 0) return;
-
-    // Translate \n -> \r\n for telnet client
-    const char* p   = buf;
-    const char* end = buf + len;
-    while (p < end)
-    {
-        const char* nl = (const char*)memchr(p, '\n', end - p);
-        if (!nl)
-        {
-            if (send(telnetFd, p, end - p, MSG_DONTWAIT) < 0)
-                telnetFd = -1;
-            break;
-        }
-        if (nl > p && send(telnetFd, p, nl - p, MSG_DONTWAIT) < 0)
-            { telnetFd = -1; break; }
-        if (send(telnetFd, "\r\n", 2, MSG_DONTWAIT) < 0)
-            { telnetFd = -1; break; }
-        p = nl + 1;
-    }
-}
 
 void logWrite(const char* fmt, ...)
 {
@@ -130,7 +86,7 @@ void logWrite(const char* fmt, ...)
     if (len > 0)
     {
         dmesgFeed(buf, (size_t)len);
-        logWriteRaw(buf, (size_t)len);
+        consoleWriteAll(buf, (size_t)len);
     }
 }
 
@@ -142,7 +98,7 @@ void printWrite(const char* fmt, ...)
     int len = vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
     if (len > 0)
-        logWriteRaw(buf, (size_t)len);
+        consolePrint(buf, (size_t)len);
 }
 
 // ---- Verbose mode ----
@@ -163,6 +119,6 @@ void verboseWrite(const char* fmt, ...)
     if (len > 0)
     {
         dmesgFeed(buf, (size_t)len);
-        logWriteRaw(buf, (size_t)len);
+        consoleWriteAll(buf, (size_t)len);
     }
 }

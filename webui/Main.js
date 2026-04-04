@@ -54,9 +54,10 @@ css`
 `;
 
 // Main entry point, create Application and mount
-export function main(deviceUrl)
+export function main()
 {
-    // Patch device url
+    // In dev, VITE_DEVICE_URL points at the physical device
+    const deviceUrl = import.meta.env.VITE_DEVICE_URL;
     if (deviceUrl)
         config.deviceUrl = deviceUrl;
 

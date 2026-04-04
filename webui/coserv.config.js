@@ -7,6 +7,8 @@ const config = {
                 "codemirror",
                 "@codemirror/lang-javascript",
                 "@lezer/highlight",
+                "xterm",
+                "@xterm/addon-fit",
             ],
             replace: [
                 { from: "./Main.js", to: "/Main.js" },

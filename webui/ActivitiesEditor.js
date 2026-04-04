@@ -61,7 +61,7 @@ async function ensureBinpackTypes(deviceUrl)
     const source = await r.text();
     const blob   = new Blob([source], { type: "application/javascript" });
     const url    = URL.createObjectURL(blob);
-    const mod    = await import(url);
+    const mod    = await import(url  /* @vite-ignore */ );
     const typeDefs = mod.default;
 
     if (!Array.isArray(typeDefs) || typeDefs.length === 0)
@@ -358,7 +358,7 @@ export class ActivitiesEditor extends Component
             let data;
             try
             {
-                const mod = await import(activitiesUrl);
+                const mod = await import(activitiesUrl  /* @vite-ignore */ );
                 data = mod.default;
             }
             finally

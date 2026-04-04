@@ -1,79 +1,125 @@
 import { Component, css, router } from "@codeonlyjs/core";
 import { config } from "./config.js";
+import { Terminal } from "xterm";
+import { FitAddon } from "@xterm/addon-fit";
+import "xterm/css/xterm.css";
 
 class ConsolePage extends Component
 {
-    entries = [];
-    busy = false;
+    // Lazily initialised — Terminal.open() requires the element to be in the DOM,
+    // so we initialise on first mount rather than in the constructor.
+    #terminal        = null;
+    #fitAddon        = null;
+    #resizeObserver  = null;
+    #termContainer   = null;   // manually created — not owned by CodeOnly template
+    #ws              = null;
+    #mounted         = false;
+    #initialized     = false;
 
-    async runCommand(cmd)
+    get #wsUrl()
     {
-        this.entries.push({ kind: "command", text: cmd });
-        this.busy = true;
-        this.update();
-        this.outputEl.scrollTop = this.outputEl.scrollHeight;
-
-        try
-        {
-            let r = await fetch(`${config.deviceUrl}/api/command`, {
-                method: "POST",
-                body: cmd,
-            });
-            let text = await r.text();
-            if (!r.ok)
-                this.entries.push({ kind: "error", text: `Error ${r.status}: ${text}` });
-            else
-                this.entries.push({ kind: "response", text });
-        }
-        catch (e)
-        {
-            this.entries.push({ kind: "error", text: e.message });
-        }
-
-        this.busy = false;
-        this.update();
-        this.outputEl.scrollTop = this.outputEl.scrollHeight;
+        // In dev mode config.deviceUrl is the device origin (e.g. "http://10.1.1.101").
+        // In prod mode it is empty and we connect to the same host.
+        const base = config.deviceUrl || window.location.origin;
+        const url  = new URL(base);
+        return `ws://${url.hostname}:81`;
     }
 
-    onKeyDown(ev)
+    onMount()
     {
-        if (ev.key !== "Enter" || this.busy)
-            return;
-        let cmd = this.cmdInput.value.trim();
-        if (!cmd)
-            return;
-        this.cmdInput.value = "";
-        this.runCommand(cmd);
+        this.#mounted = true;
+
+        if (!this.#initialized)
+        {
+            this.#initialized = true;
+
+            // Create the terminal container ourselves so CodeOnly never re-renders it
+            this.#termContainer = document.createElement("div");
+            this.#termContainer.className = "console-terminal";
+        }
+
+        // Re-append every mount — CodeOnly may recreate termEl on each render cycle
+        if (!this.termEl.contains(this.#termContainer))
+        {
+            this.termEl.appendChild(this.#termContainer);
+        }
+
+        if (!this.#terminal)
+        {
+
+            this.#terminal = new Terminal({
+                convertEol:  true,    // translate \n → \r\n client-side
+                cursorBlink: true,
+                fontSize:    14,
+                fontFamily:  "monospace",
+                theme: {
+                    selectionBackground: "rgba(255, 255, 255, 0.25)",
+                    selectionForeground: "#ffffff",
+                    selectionInactiveBackground: "rgba(255, 255, 255, 0.15)",
+                },
+            });
+
+            this.#fitAddon = new FitAddon();
+            this.#terminal.loadAddon(this.#fitAddon);
+            this.#terminal.open(this.#termContainer);
+
+            // Forward keystrokes to the device
+            this.#terminal.onData(data => {
+                if (this.#ws?.readyState === WebSocket.OPEN)
+                    this.#ws.send(data);
+            });
+
+            this.#resizeObserver = new ResizeObserver(() => this.#fitAddon?.fit());
+            this.#resizeObserver.observe(this.#termContainer);
+        }
+
+        requestAnimationFrame(() => {
+            if (!this.#mounted) return;
+            this.#fitAddon?.fit();
+            this.#terminal?.refresh(0, this.#terminal.rows - 1);
+            this.#terminal?.focus();
+        });
+        if (!this.#ws || this.#ws.readyState === WebSocket.CLOSED)
+            this.#connect();
+    }
+
+    onUnmount()
+    {
+        this.#mounted = false;
+        // Keep the WebSocket alive — page is a singleton, reconnect on next mount if needed
+    }
+
+    #connect()
+    {
+        if (!this.#mounted || !this.#terminal) return;
+
+        this.#terminal.writeln("\x1b[33mConnecting…\x1b[0m");
+
+        const ws   = new WebSocket(this.#wsUrl);
+        this.#ws   = ws;
+
+        ws.onopen = () => {
+            if (this.#ws !== ws) return;
+            this.#terminal?.writeln("\x1b[32mConnected\x1b[0m");
+        };
+
+        ws.onmessage = (e) => {
+            if (this.#ws !== ws) return;
+            this.#terminal?.write(e.data);
+        };
+
+        ws.onclose = () => {
+            if (this.#ws !== ws) return;
+            this.#ws = null;
+            this.#terminal?.writeln("\x1b[31m\r\n[disconnected — retrying in 3 s]\x1b[0m");
+            setTimeout(() => this.#connect(), 3000);
+        };
     }
 
     static template = {
         type: "div",
         class: "console-page",
-        $: [
-            {
-                type: "div",
-                class: "console-output",
-                bind: "outputEl",
-                $: {
-                    foreach: { items: c => c.entries, itemKey: (e, ctx) => ctx.index },
-                    type: "pre",
-                    class: e => `console-entry console-${e.kind}`,
-                    text: e => e.kind === "command" ? `> ${e.text}` : e.text,
-                }
-            },
-            {
-                type: "div",
-                class: "console-input-bar",
-                $: {
-                    type: "input type=text",
-                    class: "console-input",
-                    bind: "cmdInput",
-                    placeholder: "Enter command…",
-                    attr_disabled: c => c.busy || undefined,
-                    on_keydown: "onKeyDown",
-                }
-            }
-        ]
+        bind: "termEl",
     }
 }
 
@@ -83,70 +129,20 @@ css`
     display: flex;
     flex-direction: column;
     height: calc(100vh - var(--header-height));
+    padding: 8px;
+    box-sizing: border-box;
+    background: #000;
+}
 
-    .console-output
-    {
-        flex: 1;
-        overflow-y: auto;
-        padding: 12px 16px;
-
-        .console-entry
-        {
-            margin: 0;
-            font-family: monospace;
-            font-size: 0.85rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-            line-height: 1.5;
-        }
-
-        .console-command
-        {
-            color: var(--accent-color, #4af);
-        }
-
-        .console-response
-        {
-            color: var(--body-fore-color);
-        }
-
-        .console-error
-        {
-            color: var(--danger-color, #c00);
-        }
-    }
-
-    .console-input-bar
-    {
-        border-top: 1px solid var(--gridline-color);
-        padding: 8px 12px;
-
-        .console-input
-        {
-            width: 100%;
-            font-family: monospace;
-            font-size: 0.9rem;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: var(--body-fore-color);
-            box-sizing: border-box;
-
-            &::placeholder
-            {
-                opacity: 0.4;
-            }
-
-            &:disabled
-            {
-                opacity: 0.5;
-            }
-        }
-    }
+.console-terminal
+{
+    flex: 1;
+    min-height: 0;
+    position: relative;   /* required so xterm's absolute children size correctly */
 }
 `
 
-// Singleton — preserves console history across route navigations
+// Singleton — keeps the terminal alive across route navigations
 let consolePage = null;
 
 router.register({

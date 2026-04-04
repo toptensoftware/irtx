@@ -6,7 +6,8 @@
 #include "activities.h"
 #include "http.h"
 #include "web_files.h"
-#include "serial.h"
+#include "commands.h"
+#include "console.h"
 #include "log.h"
 
 static WebServer server(80);
@@ -163,21 +164,21 @@ static void handlePostReloadActivities()
 static void handleGetStatus()
 {
     addCorsHeaders();
-    String output;
-    logStartCapture(&output);
+    CaptureConsole cap;
+    consoleSetActive(&cap);
     handleCommand("status");
-    logEndCapture();
-    server.send(200, "application/json", output);
+    consoleSetActive(nullptr);
+    server.send(200, "application/json", cap.output);
 }
 
 static void handleGetDmesg()
 {
     addCorsHeaders();
-    String output;
-    logStartCapture(&output);
+    CaptureConsole cap;
+    consoleSetActive(&cap);
     dmesgPrint();
-    logEndCapture();
-    server.send(200, "text/plain", output);
+    consoleSetActive(nullptr);
+    server.send(200, "text/plain", cap.output);
 }
 
 static void handlePostCommand()
@@ -190,11 +191,11 @@ static void handlePostCommand()
         server.send(400, "text/plain", "No command\n");
         return;
     }
-    String output;
-    logStartCapture(&output);
+    CaptureConsole cap;
+    consoleSetActive(&cap);
     handleCommand(cmd.c_str());
-    logEndCapture();
-    server.send(200, "text/plain", output);
+    consoleSetActive(nullptr);
+    server.send(200, "text/plain", cap.output);
 }
 
 // ---- Setup ----

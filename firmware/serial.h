@@ -1,6 +1,10 @@
 #pragma once
+#include "console.h"
 
-// Handle a null-terminated command line. Output goes via LOG/PRINT (Serial + telnet).
-void handleCommand(const char* line);
-
-void pollSerial();
+class SerialConsole : public Console
+{
+public:
+    void poll();
+    void write(const char* buf, size_t len) override;
+    bool isConnected() const override { return true; }
+};

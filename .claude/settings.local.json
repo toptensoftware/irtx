@@ -7,7 +7,17 @@
       "Bash(npx @toptensoftware/binpack --header:firmware/activities_types.h)",
       "Bash(ls C:/Users/Brad/Projects/irtx/*.md)",
       "Bash(node:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(grep -E \"\\\\.\\(js|json\\)$\")",
+      "Bash(curl:*)",
+      "Bash(powershell.exe -NoProfile -Command ':*)",
+      "Bash(powershell.exe:*)",
+      "Bash(powershell:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:xtermjs.org)",
+      "WebFetch(domain:opendev.org)",
+      "WebFetch(domain:newreleases.io)"
     ]
   }
 }

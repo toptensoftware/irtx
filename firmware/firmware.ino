@@ -16,13 +16,19 @@
 #include "ir_rx.h"
 #include "ir_tx.h"
 #include "wifi_udp.h"
+#include "console.h"
 #include "serial.h"
 #include "telnet.h"
+#include "ws.h"
 #include "ble.h"
 #include "filesystem.h"
 #include "http.h"
 #include "activities.h"
 #include "gpio.h"
+
+static SerialConsole  serialConsole;
+static TelnetConsole  telnetConsole;
+static WsConsole      wsConsole;
 
 void setup()
 {
@@ -30,6 +36,12 @@ void setup()
 
     Serial.begin(115200);
     delay(2000);
+
+    // Register consoles before any LOG() calls so output is not lost
+    consoleRegister(&serialConsole);
+    consoleRegister(&telnetConsole);
+    consoleRegister(&wsConsole);
+
     Serial.println("\n=== ESP32 IR Remote ===");
 
     setupDeviceName();
@@ -48,13 +60,14 @@ void setup()
 
 void loop()
 {
-    pollSerial();
+    serialConsole.poll();
     pollGpio();
     pollIrRx();
     pollIrTx();
     pollWifi();
     pollHttp();
     pollActivities();
-    pollTelnet();
+    telnetConsole.poll();
+    wsConsole.poll();
     pollBle();
 }
