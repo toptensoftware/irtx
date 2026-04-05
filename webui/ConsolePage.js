@@ -32,6 +32,8 @@ class ConsolePage extends Component
             return {
                 background:                    "#1e1e1e",
                 foreground:                    "#dedede",
+                cursor:                        "#dedede",
+                cursorAccent:                  "#1e1e1e",
                 selectionBackground:           "rgba(255, 255, 255, 0.25)",
                 selectionForeground:           "#ffffff",
                 selectionInactiveBackground:   "rgba(255, 255, 255, 0.15)",
@@ -42,6 +44,8 @@ class ConsolePage extends Component
             return {
                 background:                    "#ffffff",
                 foreground:                    "#000000",
+                cursor:                        "#000000",
+                cursorAccent:                  "#ffffff",
                 selectionBackground:           "rgba(0, 0, 0, 0.2)",
                 selectionForeground:           "#000000",
                 selectionInactiveBackground:   "rgba(0, 0, 0, 0.1)",
@@ -99,6 +103,11 @@ class ConsolePage extends Component
 
             this.#resizeObserver = new ResizeObserver(() => this.#fitAddon?.fit());
             this.#resizeObserver.observe(this.#termContainer);
+        }
+        else
+        {
+            // Re-apply current theme in case it changed while the page was unmounted
+            this.#terminal.options.theme = this.#makeTheme(window.stylish?.darkMode ?? true);
         }
 
         requestAnimationFrame(() => {
