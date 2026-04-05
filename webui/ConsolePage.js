@@ -25,6 +25,36 @@ class ConsolePage extends Component
         return `ws://${url.hostname}:81`;
     }
 
+    #makeTheme(isDark)
+    {
+        if (isDark)
+        {
+            return {
+                background:                    "#1e1e1e",
+                foreground:                    "#dedede",
+                selectionBackground:           "rgba(255, 255, 255, 0.25)",
+                selectionForeground:           "#ffffff",
+                selectionInactiveBackground:   "rgba(255, 255, 255, 0.15)",
+            };
+        }
+        else
+        {
+            return {
+                background:                    "#ffffff",
+                foreground:                    "#000000",
+                selectionBackground:           "rgba(0, 0, 0, 0.2)",
+                selectionForeground:           "#000000",
+                selectionInactiveBackground:   "rgba(0, 0, 0, 0.1)",
+            };
+        }
+    }
+
+    #onThemeChange = (e) =>
+    {
+        if (this.#terminal)
+            this.#terminal.options.theme = this.#makeTheme(e.darkMode);
+    };
+
     onMount()
     {
         this.#mounted = true;
@@ -44,6 +74,8 @@ class ConsolePage extends Component
             this.termEl.appendChild(this.#termContainer);
         }
 
+        window.stylish?.addEventListener("darkModeChanged", this.#onThemeChange);
+
         if (!this.#terminal)
         {
 
@@ -52,11 +84,7 @@ class ConsolePage extends Component
                 cursorBlink: true,
                 fontSize:    14,
                 fontFamily:  "monospace",
-                theme: {
-                    selectionBackground: "rgba(255, 255, 255, 0.25)",
-                    selectionForeground: "#ffffff",
-                    selectionInactiveBackground: "rgba(255, 255, 255, 0.15)",
-                },
+                theme:       this.#makeTheme(window.stylish?.darkMode ?? true),
             });
 
             this.#fitAddon = new FitAddon();
@@ -86,6 +114,7 @@ class ConsolePage extends Component
     onUnmount()
     {
         this.#mounted = false;
+        window.stylish?.removeEventListener("darkModeChanged", this.#onThemeChange);
         // Keep the WebSocket alive — page is a singleton, reconnect on next mount if needed
     }
 
@@ -131,7 +160,7 @@ css`
     height: calc(100vh - var(--header-height));
     padding: 8px;
     box-sizing: border-box;
-    background: #000;
+    background: var(--body-back-color);
 }
 
 .console-terminal
