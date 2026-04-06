@@ -192,8 +192,9 @@ export default config;
 
 ## Writing `activities.js`
 
-Activity configurations are written as ES module JavaScript files and compiled to binary
-using the `@toptensoftware/binpack` tool (or the `irtx-node` CLI which wraps it).
+Activity configurations are written as ES module JavaScript files.  They can be edited
+directly in the built-in web UI at `http://<device>/activity-editor`, or compiled to binary
+locally using the `@toptensoftware/binpack` tool (or the `irtx-node` CLI which wraps it).
 
 ### Importing helpers
 
