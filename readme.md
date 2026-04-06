@@ -190,6 +190,234 @@ export default config;
 ```
 
 
+## Writing `activities.js`
+
+Activity configurations are written as ES module JavaScript files and compiled to binary
+using the `@toptensoftware/binpack` tool (or the `irtx-node` CLI which wraps it).
+
+### Importing helpers
+
+The `binpack.js` schema file (served from the device at `/binpack.js` and mapped to the
+module specifier `irtx:binpack` by the toolchain) exports everything you need:
+
+```js
+import { op, binding, repeatBehaviour, irEventKindMask, bindingFlags,
+         riff, parseIPv4, parseMacAddress } from "irtx:binpack";
+```
+
+### File structure
+
+An `activities.js` file must default-export the root configuration object:
+
+```js
+export default {
+    version: 1,
+    devices: [ /* device definitions */ ],
+    activities: [ /* activity definitions */ ],
+};
+```
+
+### Devices
+
+Each device has a name and optional `turnOn` / `turnOff` op sequences.  When switching
+activities, the firmware powers devices on and off automatically based on which devices the
+old and new activities reference.
+
+```js
+devices: [
+    {
+        name: "tv",
+        turnOn:  op.sendIr("NEC:0x20dfb34c"),
+        turnOff: op.sendIr("NEC:0x20dfa35c"),
+    },
+    {
+        name: "receiver",
+        turnOn:  op.httpGet("http://10.1.1.125/YamahaExtendedControl/v1/main/setPower?power=on"),
+        turnOff: op.httpGet("http://10.1.1.125/YamahaExtendedControl/v1/main/setPower?power=standby"),
+    },
+]
+```
+
+`turnOn` and `turnOff` accept either a single op or an array of ops.
+
+### Activities
+
+Each activity declares the devices it needs and optional lifecycle hooks:
+
+```js
+activities: [
+    {
+        name: "off",
+        devices: [],               // all devices powered off
+    },
+    {
+        name: "watchTv",
+        devices: ["tv", "receiver"],   // referenced by name; others are powered off
+
+        // Lifecycle hooks — single op or array of ops, all optional
+        willActivate:   [ /* ops run before devices are powered */ ],
+        didActivate:    op.httpGet("http://10.1.1.125/.../main/setInput?input=hdmi1"),
+        willDeactivate: [ /* ops run before devices are powered down */ ],
+        didDeactivate:  [ /* ops run after leaving this activity */ ],
+
+        bindings: [ /* see below */ ],
+    },
+]
+```
+
+Lifecycle order when switching from A → B:
+`A.willDeactivate` → `B.willActivate` → device power changes → `B.didActivate` → `A.didDeactivate`
+
+### Bindings
+
+A binding maps an input event (`on`) to a sequence of ops (`do`):
+
+```js
+bindings: [
+    {
+        on: binding.ir("NEC:0x20df40bf"),         // trigger
+        do: op.httpGet("http://...?volume=up"),   // single op or array of ops
+    },
+]
+```
+
+The optional `flags` field accepts values from `bindingFlags`:
+
+| Flag | Meaning |
+|------|---------|
+| `bindingFlags.continue_routing` | Don't stop after this binding fires; continue checking remaining bindings |
+
+#### `binding.ir(code)`
+
+Matches a received IR code.  The `code` string format is:
+
+- `"PROTOCOL:VALUE"` — e.g. `"NEC:0x20df40bf"`, `"PANA:0x400401000405"`
+- `"PROTOCOL:MODIFIER+VALUE"` — fires only when `MODIFIER` was received within the last 5 s
+- `"*"` — wildcard, matches any received IR code
+
+The returned object can be extended with extra fields:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `eventMask` | `press` | Bitmask of `irEventKindMask` values to match |
+| `minHoldTime` | `0` | Minimum hold time in ms before the binding fires (0 = immediate) |
+| `repeatRate` | `0` | Synthetic repeat interval in ms (0 = natural IR repeat rate) |
+
+```js
+{ on: { ...binding.ir("NEC:0x20df40bf"), eventMask: irEventKindMask.press | irEventKindMask.repeat }, do: ... }
+```
+
+#### `binding.gpio(pin)`
+
+Matches a button press on the given GPIO pin number (configured with `gpio <pin> pulldown/pullup`).
+
+Extra fields available on the returned object:
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `eventMask` | `press` | `irEventKindMask.press`, `.repeat`, `.release` |
+| `minHoldTime` | `0` | ms held before firing (0 = immediate) |
+| `initialDelay` | `0` | ms after press before first repeat (0 = use repeatRate) |
+| `repeatRate` | `0` | Repeat interval in ms (0 = no repeat) |
+
+#### `binding.encoder_inc(pin)` / `binding.encoder_dec(pin)`
+
+Matches rotary encoder clockwise (`_inc`) or counter-clockwise (`_dec`) rotation on the
+encoder whose A-pin is `pin`.  The optional `minVelocityPeriod` field (ms, default 0) limits
+firing to encoder velocities at or below the given period.
+
+### Operations (`op`)
+
+All ops can be used as a single value or inside an array wherever an op sequence is expected.
+
+#### `op.sendIr(irCode, ipAddr?, repeat?)`
+
+Transmits an IR code locally or forwards it to a remote irtx device via UDP.
+
+- `irCode` — `"PROTOCOL:VALUE"` string, e.g. `"NEC:0x20df40bf"`
+- `ipAddr` — IPv4 address string `"10.1.1.x"` or integer (default `0` = transmit locally)
+- `repeat` — one of the `repeatBehaviour` constants (default `repeatBehaviour.default`)
+
+`repeatBehaviour` values:
+
+| Constant | Behaviour |
+|----------|-----------|
+| `repeatBehaviour.default` | Block the op queue until the IR transmitter is free, then send a full code frame |
+| `repeatBehaviour.sendRepeat` | If the same code is already in-flight, send a NEC repeat frame and unblock; otherwise block |
+| `repeatBehaviour.dropIfBusy` | If the same code is already in-flight, discard and unblock; otherwise block |
+
+#### `op.httpGet(url)`
+
+Makes an HTTP GET request to `url`.
+
+#### `op.httpPost(url)`
+
+Makes an HTTP POST request to `url`.
+
+#### `op.sendWol(macaddr)`
+
+Sends a Wake-on-LAN magic packet to the given MAC address (`"AA:BB:CC:DD:EE:FF"` string or
+array of 6 bytes).
+
+#### `op.delay(ms)`
+
+Pauses op-queue execution for `ms` milliseconds.
+
+#### `op.led(color)`
+
+Sets the onboard LED to `color` (a packed 32-bit RGB integer).  The optional `period` and
+`duration` fields (set directly on the returned object) control blink period and auto-off time.
+
+#### `op.udp(ip, data)`
+
+Sends a raw UDP packet.  `ip` is an IPv4 address string or integer; `data` is a byte array.
+
+#### `op.switchActivity(indexOrName)`
+
+Switches to another activity, referenced by its zero-based index or by name string.
+
+#### `op.match_string(str)`
+
+Searches the body of the most recent HTTP response for `str`.  Sets an internal boolean
+register used by `op.if_true`.
+
+#### `op.if_true(trueOps, falseOps)`
+
+Branches on the result of the most recent `op.match_string` call.  `trueOps` and `falseOps`
+are each a single op or an array of ops.
+
+#### `op.wait_http()`
+
+Blocks the op queue until the most recent HTTP request completes.
+
+### Helper functions
+
+#### `riff(str)`
+
+Encodes a 4-character ASCII string as a little-endian 32-bit FourCC integer (the format used
+for IR protocol IDs).  Pass a string (`"NEC "`, `"PANA"`) or an integer (returned unchanged).
+
+#### `parseIPv4(ip)`
+
+Parses a dotted-decimal IPv4 address string into a 32-bit integer.  Pass a string or integer
+(returned unchanged).
+
+#### `parseMacAddress(mac)`
+
+Parses a colon-separated MAC address string into an array of 6 integers.  Pass a string or
+array (returned unchanged).
+
+### Constants
+
+| Export | Values |
+|--------|--------|
+| `irEventKindMask` | `press` (1), `repeat` (2), `long_press` (4), `release` (8) |
+| `repeatBehaviour` | `default` (0), `sendRepeat` (1), `dropIfBusy` (2) |
+| `bindingFlags` | `continue_routing` (1) |
+| `bindingType` | `ir` (1), `ir_any` (2), `gpio` (3), `gpio_encoder` (4) |
+| `opId` | Numeric IDs for all op types (normally accessed via the `op` class helpers) |
+
+
 ## Configuring the Device
 
 Wifi needs to be configured through serial terminal program.  Once Wifi is enabled, all other
