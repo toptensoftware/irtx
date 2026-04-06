@@ -380,7 +380,8 @@ Switches to another activity, referenced by its zero-based index or by name stri
 #### `op.match_string(str)`
 
 Searches the body of the most recent HTTP response for `str`.  Sets an internal boolean
-register used by `op.if_true`.
+register used by `op.if_true`.  Use `op.wait_http()` before this op to ensure the HTTP
+response has been fully received before searching.
 
 #### `op.if_true(trueOps, falseOps)`
 
