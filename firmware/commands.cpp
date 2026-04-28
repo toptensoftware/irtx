@@ -16,7 +16,17 @@ void handleCommand(const char* line)
 {
     while (*line == ' ') line++;
 
-    if (strncmp(line, "setwifi ", 8) == 0)
+    if (strcmp(line, "clearwifi") == 0)
+    {
+        prefs.begin("wifi", false);
+        prefs.remove("ssid");
+        prefs.remove("password");
+        prefs.end();
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        LOG("WiFi credentials cleared\n");
+    }
+    else if (strncmp(line, "setwifi ", 8) == 0)
     {
         const char* p = line + 8;
         while (*p == ' ') p++;
@@ -254,6 +264,9 @@ void handleCommand(const char* line)
     else if (strcmp(line, "nvsreset") == 0)
     {
         nvsReset();
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        setupGpioConfig();
     }
     else if (strncmp(line, "verbose ", 8) == 0)
     {
@@ -289,6 +302,7 @@ void handleCommand(const char* line)
     else if (strcmp(line, "help") == 0)
     {
         PRINT("Commands:\n");
+        PRINT("  clearwifi                              Clear WiFi credentials and disconnect\n");
         PRINT("  setwifi <ssid> <password>              Save WiFi credentials and reconnect\n");
         PRINT("  setap <ssid> [<password>]              Save AP credentials (pw must be 8+ chars, default: irtx1234)\n");
         PRINT("  setbootpin <pin> [<pin>]               Pin(s) that trigger AP mode at boot\n");
@@ -306,7 +320,7 @@ void handleCommand(const char* line)
         PRINT("  status                                 Show full device status\n");
         PRINT("  dmesg                                  Print boot log\n");
         PRINT("  nvsdump                                Dump NVS storage contents\n");
-        PRINT("  nvsreset                               Reset all NVS storage\n");
+        PRINT("  nvsreset                               Reset all NVS storage (no reboot)\n");
         PRINT("  reboot                                 Restart the device\n");
         PRINT("  help                                   Show this help\n");
     }
