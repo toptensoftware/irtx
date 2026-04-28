@@ -266,6 +266,7 @@ void handleCommand(const char* line)
         nvsReset();
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
+        setupGpioConfig();
     }
     else if (strncmp(line, "verbose ", 8) == 0)
     {
