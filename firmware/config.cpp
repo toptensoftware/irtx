@@ -31,8 +31,5 @@ void nvsReset()
     PRINT("Erasing NVS...\n");
     nvs_flash_erase();
     nvs_flash_init();
-
-    PRINT("Rebooting...\n");
-    delay(500);
-    esp_restart();
+    PRINT("NVS cleared\n");
 }
